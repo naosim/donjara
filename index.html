@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ドンジャラ点数管理</title>
+  <style>
+    :root {
+      --primary: #4F46E5;
+      --primary-hover: #4338CA;
+      --bg-color: #F3F4F6;
+      --card-bg: #FFFFFF;
+      --text-color: #1F2937;
+      --text-muted: #6B7280;
+      --danger: #EF4444;
+      --danger-hover: #DC2626;
+      --success: #10B981;
+      --accent: #F59E0B;
+      --border-radius: 12px;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      padding: 16px;
+      max-width: 800px;
+      margin: 0 auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #E5E7EB;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .header-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 16px;
+      font-size: 0.95rem;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: #E5E7EB;
+      color: var(--text-color);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #D1D5DB;
+    }
+
+    .btn-danger {
+      background: #FEE2E2;
+      color: var(--danger);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: #FCA5A5;
+    }
+
+    .btn-accent {
+      background: #FEF3C7;
+      color: #D97706;
+    }
+
+    .btn-accent:hover:not(:disabled) {
+      background: #FDE68A;
+    }
+
+    /* Scoreboard Grid */
+    .scoreboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .score-card {
+      background: var(--card-bg);
+      border-radius: var(--border-radius);
+      padding: 16px 12px;
+      text-align: center;
+      box-shadow: var(--shadow);
+      border: 2px solid transparent;
+      transition: transform 0.1s ease;
+    }
+
+    .score-card.selectable {
+      cursor: pointer;
+    }
+
+    .score-card.selected-winner {
+      border-color: var(--success);
+      background-color: #ECFDF5;
+    }
+
+    .score-card.selected-target {
+      border-color: var(--danger);
+      background-color: #FEF2F2;
+    }
+
+    .player-name {
+      font-size: 1rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .player-score {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--text-color);
+    }
+
+    .player-score.minus {
+      color: var(--danger);
+    }
+
+    /* Action Panel */
+    .action-panel {
+      background: var(--card-bg);
+      border-radius: var(--border-radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .selector-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .select-btn {
+      padding: 12px 8px;
+      background: #F3F4F6;
+      color: var(--text-color);
+      border: 2px solid #E5E7EB;
+      border-radius: 8px;
+      font-size: 0.95rem;
+    }
+
+    .select-btn.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .input-group {
+      margin-bottom: 20px;
+    }
+
+    .input-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .point-input {
+      width: 100%;
+      padding: 12px;
+      font-size: 1.25rem;
+      font-weight: 700;
+      border: 2px solid #D1D5DB;
+      border-radius: 8px;
+      outline: none;
+      text-align: center;
+    }
+
+    .point-input:focus {
+      border-color: var(--primary);
+    }
+
+    .quick-pts {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .quick-pts button {
+      flex: 1;
+      min-width: 60px;
+      padding: 8px 0;
+      background: #F3F4F6;
+      color: var(--text-color);
+      font-size: 0.85rem;
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 16px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border-radius: 10px;
+      margin-top: 10px;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      background: white;
+      width: 100%;
+      max-width: 500px;
+      border-radius: var(--border-radius);
+      padding: 24px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+
+    .modal h2 {
+      margin-bottom: 16px;
+      font-size: 1.25rem;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #D1D5DB;
+      border-radius: 6px;
+      font-size: 1rem;
+    }
+
+    .player-inputs {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .radio-label {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px;
+      border: 1px solid #E5E7EB;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .radio-label input {
+      margin-top: 3px;
+    }
+
+    .radio-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: block;
+    }
+
+    .log-area {
+      background: var(--card-bg);
+      border-radius: var(--border-radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+      margin-top: auto;
+    }
+
+    .log-list {
+      list-style: none;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      max-height: 100px;
+      overflow-y: auto;
+    }
+
+    .log-list li {
+      padding: 4px 0;
+      border-bottom: 1px solid #F3F4F6;
+    }
+
+    @media (max-width: 480px) {
+      .scoreboard {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1>ドンジャラ点数管理</h1>
+    <div class="header-btns">
+      <button class="btn-accent" id="undoBtn" onclick="app.undo()" disabled>↺ 1手戻す</button>
+      <button class="btn-secondary" onclick="app.openSettings()">⚙ 設定</button>
+    </div>
+  </header>
+
+  <!-- Score Board -->
+  <div class="scoreboard" id="scoreboard"></div>
+
+  <!-- Main Action Panel -->
+  <div class="action-panel">
+    <div class="section-title">1. 勝利者を選択</div>
+    <div class="selector-grid" id="winnerSelector"></div>
+
+    <div class="section-title">2. 獲得ポイント</div>
+    <div class="input-group">
+      <input type="number" id="pointInput" class="point-input" placeholder="0" min="1" step="1">
+      <div class="quick-pts">
+        <button onclick="app.setQuickPoint(10)">10</button>
+        <button onclick="app.setQuickPoint(20)">20</button>
+        <button onclick="app.setQuickPoint(30)">30</button>
+        <button onclick="app.setQuickPoint(40)">40</button>
+        <button onclick="app.setQuickPoint(60)">60</button>
+      </div>
+    </div>
+
+    <div class="section-title">3. 支払い方法</div>
+    <div class="selector-grid">
+      <button class="select-btn active" id="typeAllBtn" onclick="app.setPaymentType('all')">全員から</button>
+      <button class="select-btn" id="typeOneBtn" onclick="app.setPaymentType('one')">誰かから</button>
+    </div>
+
+    <div id="targetSection" style="display: none;">
+      <div class="section-title">4. 支払い対象者を選択</div>
+      <div class="selector-grid" id="targetSelector"></div>
+    </div>
+
+    <button class="btn-primary submit-btn" onclick="app.submitTransaction()">点数を移動する</button>
+  </div>
+
+  <!-- Log / Control -->
+  <div class="log-area">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <span class="section-title" style="margin:0;">履歴</span>
+      <button class="btn-danger" style="padding: 4px 8px; font-size: 0.8rem;"
+        onclick="app.resetScores()">点数のみリセット</button>
+    </div>
+    <ul class="log-list" id="logList">
+      <li>ゲームが開始されました。</li>
+    </ul>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal">
+      <h2>設定</h2>
+
+      <div class="form-group">
+        <label for="playerCount">プレイヤー人数</label>
+        <select id="playerCount" class="form-control" onchange="app.renderPlayerInputs()">
+          <option value="2">2人</option>
+          <option value="3">3人</option>
+          <option value="4" selected>4人</option>
+          <option value="5">5人</option>
+          <option value="6">6人</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>プレイヤー名</label>
+        <div class="player-inputs" id="playerInputs"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="defaultScore">初期点数</label>
+        <input type="number" id="defaultScore" class="form-control" value="60">
+      </div>
+
+      <div class="form-group">
+        <label>「全員から」の端数処理ルール</label>
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" name="fractionRule" value="random" checked>
+            <div>
+              <strong>ランダム</strong>
+              <span class="radio-desc">余り分を支払う人をランダムで決定</span>
+            </div>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="fractionRule" value="reduce">
+            <div>
+              <strong>得点を減らす</strong>
+              <span class="radio-desc">端数を切り捨てて勝者の総獲得点を下げる</span>
+            </div>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="fractionRule" value="highest">
+            <div>
+              <strong>得点の多いプレイヤーから取る</strong>
+              <span class="radio-desc">持ち点が多い人が端数を負担（同点はランダム）</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 20px;">
+        <button class="btn-primary" style="flex:1;" onclick="app.saveSettings()">保存して新しく始める</button>
+        <button class="btn-secondary" onclick="app.closeSettings()">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    class DonjaraApp {
+      constructor() {
+        this.state = {
+          players: [], // { id, name, score }
+          winnerId: null,
+          targetId: null,
+          paymentType: 'all', // 'all' | 'one'
+          fractionRule: 'random', // 'random' | 'reduce' | 'highest'
+          defaultScore: 60,
+          history: [], // for Undo (stores serialized state of players)
+          logs: []
+        };
+
+        this.STORAGE_KEY = 'donjara_app_state_v1';
+        this.init();
+      }
+
+      init() {
+        const saved = localStorage.getItem(this.STORAGE_KEY);
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            this.state = { ...this.state, ...parsed };
+          } catch (e) {
+            console.error('Failed to load storage', e);
+            this.setDefaultState();
+          }
+        } else {
+          this.setDefaultState();
+        }
+
+        this.render();
+        if (!saved) {
+          this.openSettings();
+        }
+      }
+
+      setDefaultState() {
+        this.state.defaultScore = 60;
+        this.state.fractionRule = 'random';
+        this.state.players = [
+          { id: 1, name: 'プレイヤー1', score: 60 },
+          { id: 2, name: 'プレイヤー2', score: 60 },
+          { id: 3, name: 'プレイヤー3', score: 60 },
+          { id: 4, name: 'プレイヤー4', score: 60 }
+        ];
+        this.state.history = [];
+        this.state.logs = ['ゲームを開始しました。'];
+      }
+
+      save() {
+        const dataToSave = {
+          players: this.state.players,
+          fractionRule: this.state.fractionRule,
+          defaultScore: this.state.defaultScore,
+          history: this.state.history,
+          logs: this.state.logs
+        };
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(dataToSave));
+      }
+
+      // --- UI Rendering ---
+
+      render() {
+        this.renderScoreboard();
+        this.renderWinnerSelector();
+        this.renderTargetSelector();
+        this.renderLogs();
+
+        // Update Undo Button state
+        document.getElementById('undoBtn').disabled = this.state.history.length === 0;
+      }
+
+      renderScoreboard() {
+        const sb = document.getElementById('scoreboard');
+        sb.innerHTML = '';
+        this.state.players.forEach(p => {
+          const card = document.createElement('div');
+          card.className = `score-card ${this.state.winnerId === p.id ? 'selected-winner' : ''} ${this.state.targetId === p.id ? 'selected-target' : ''}`;
+          card.onclick = () => this.selectWinner(p.id);
+
+          const scoreClass = p.score < 0 ? 'player-score minus' : 'player-score';
+          card.innerHTML = `
+                        <div class="player-name">${this.escapeHtml(p.name)}</div>
+                        <div class="${scoreClass}">${p.score}</div>
+                    `;
+          sb.appendChild(card);
+        });
+      }
+
+      renderWinnerSelector() {
+        const container = document.getElementById('winnerSelector');
+        container.innerHTML = '';
+        this.state.players.forEach(p => {
+          const btn = document.createElement('button');
+          btn.className = `select-btn ${this.state.winnerId === p.id ? 'active' : ''}`;
+          btn.innerText = p.name;
+          btn.onclick = () => this.selectWinner(p.id);
+          container.appendChild(btn);
+        });
+      }
+
+      renderTargetSelector() {
+        const container = document.getElementById('targetSelector');
+        container.innerHTML = '';
+
+        // Targets exclude winner
+        const targets = this.state.players.filter(p => p.id !== this.state.winnerId);
+
+        targets.forEach(p => {
+          const btn = document.createElement('button');
+          btn.className = `select-btn ${this.state.targetId === p.id ? 'active' : ''}`;
+          btn.innerText = p.name;
+          btn.onclick = () => this.selectTarget(p.id);
+          container.appendChild(btn);
+        });
+
+        document.getElementById('targetSection').style.display =
+          (this.state.paymentType === 'one' && this.state.winnerId) ? 'block' : 'none';
+      }
+
+      renderLogs() {
+        const list = document.getElementById('logList');
+        list.innerHTML = '';
+        this.state.logs.slice().reverse().forEach(log => {
+          const li = document.createElement('li');
+          li.innerText = log;
+          list.appendChild(li);
+        });
+      }
+
+      // --- User Actions ---
+
+      selectWinner(id) {
+        if (this.state.winnerId === id) {
+          this.state.winnerId = null;
+        } else {
+          this.state.winnerId = id;
+          if (this.state.targetId === id) {
+            this.state.targetId = null;
+          }
+        }
+        this.render();
+      }
+
+      selectTarget(id) {
+        this.state.targetId = this.state.targetId === id ? null : id;
+        this.render();
+      }
+
+      setPaymentType(type) {
+        this.state.paymentType = type;
+        document.getElementById('typeAllBtn').classList.toggle('active', type === 'all');
+        document.getElementById('typeOneBtn').classList.toggle('active', type === 'one');
+        this.renderTargetSelector();
+      }
+
+      setQuickPoint(pts) {
+        document.getElementById('pointInput').value = pts;
+      }
+
+      // --- Business Logic ---
+
+      submitTransaction() {
+        const winner = this.state.players.find(p => p.id === this.state.winnerId);
+        const ptsInput = document.getElementById('pointInput');
+        const pts = parseInt(ptsInput.value, 10);
+
+        if (!winner) {
+          alert('勝利者を選択してください。');
+          return;
+        }
+        if (isNaN(pts) || pts <= 0) {
+          alert('正の獲得ポイントを入力してください。');
+          return;
+        }
+
+        if (this.state.paymentType === 'one') {
+          const target = this.state.players.find(p => p.id === this.state.targetId);
+          if (!target) {
+            alert('支払い対象者を選択してください。');
+            return;
+          }
+          this.processOneTransaction(winner, target, pts);
+        } else {
+          this.processAllTransaction(winner, pts);
+        }
+
+        // Reset Inputs & Save
+        ptsInput.value = '';
+        this.state.winnerId = null;
+        this.state.targetId = null;
+        this.save();
+        this.render();
+      }
+
+      pushHistory() {
+        // Keep only last 1 state for single Undo
+        const snapshot = JSON.stringify(this.state.players);
+        this.state.history = [snapshot];
+      }
+
+      processOneTransaction(winner, target, pts) {
+        this.pushHistory();
+
+        target.score -= pts;
+        winner.score += pts;
+
+        const logText = `${winner.name} が ${target.name} から ${pts}pt 獲得`;
+        this.addLog(logText);
+      }
+
+      processAllTransaction(winner, pts) {
+        const losers = this.state.players.filter(p => p.id !== winner.id);
+        const loserCount = losers.length;
+        if (loserCount === 0) return;
+
+        this.pushHistory();
+
+        const base = Math.floor(pts / loserCount);
+        const remainder = pts % loserCount;
+
+        let actualGain = pts;
+        let details = [];
+
+        if (remainder === 0) {
+          // Even split
+          losers.forEach(l => {
+            l.score -= base;
+          });
+          details.push(`全員から${base}ptずつ`);
+        } else {
+          // Handles fractions
+          if (this.state.fractionRule === 'reduce') {
+            // Cut off remainder
+            actualGain = base * loserCount;
+            losers.forEach(l => {
+              l.score -= base;
+            });
+            details.push(`全員から${base}ptずつ (端数${remainder}pt切捨)`);
+          } else if (this.state.fractionRule === 'random') {
+            // Randomly pick losers to pay +1
+            const shuffled = [...losers].sort(() => 0.5 - Math.random());
+            const extraPayers = shuffled.slice(0, remainder);
+
+            losers.forEach(l => {
+              const paysExtra = extraPayers.some(ep => ep.id === l.id);
+              const payAmount = base + (paysExtra ? 1 : 0);
+              l.score -= payAmount;
+            });
+
+            const extraNames = extraPayers.map(p => p.name).join(',');
+            details.push(`基本${base}pt (${extraNames} が端数+1pt負担)`);
+          } else if (this.state.fractionRule === 'highest') {
+            // Find losers with highest score
+            const maxScore = Math.max(...losers.map(l => l.score));
+            const highestLosers = losers.filter(l => l.score === maxScore);
+
+            // Shuffle highest losers in case of tie
+            const shuffledHighest = [...highestLosers].sort(() => 0.5 - Math.random());
+
+            // Select payers for remainder
+            // If remainder > highest count, handle gracefully (take from next highest if needed, though simple selection works)
+            let extraPayerIds = new Set();
+            for (let i = 0; i < remainder; i++) {
+              if (shuffledHighest[i]) {
+                extraPayerIds.add(shuffledHighest[i].id);
+              } else {
+                // Fallback if remainder is larger than highest score array size
+                const remainingLosers = losers.filter(l => !extraPayerIds.has(l.id));
+                const fallbackPayer = remainingLosers[Math.floor(Math.random() * remainingLosers.length)];
+                if (fallbackPayer) extraPayerIds.add(fallbackPayer.id);
+              }
+            }
+
+            losers.forEach(l => {
+              const paysExtra = extraPayerIds.has(l.id);
+              const payAmount = base + (paysExtra ? 1 : 0);
+              l.score -= payAmount;
+            });
+
+            const extraNames = losers.filter(l => extraPayerIds.has(l.id)).map(p => p.name).join(',');
+            details.push(`基本${base}pt (高得点者:${extraNames} が端数+1pt負担)`);
+          }
+        }
+
+        winner.score += actualGain;
+        const logText = `${winner.name} が全員から計${actualGain}pt 獲得 (${details.join('')})`;
+        this.addLog(logText);
+      }
+
+      undo() {
+        if (this.state.history.length === 0) return;
+
+        const lastSnapshot = this.state.history.pop();
+        this.state.players = JSON.parse(lastSnapshot);
+        this.addLog('直前の操作を取り消しました。');
+        this.save();
+        this.render();
+      }
+
+      resetScores() {
+        if (!confirm('全員の点数を初期値に戻しますか？（プレイヤー設定は維持されます）')) return;
+
+        this.pushHistory();
+        this.state.players.forEach(p => {
+          p.score = parseInt(this.state.defaultScore, 10) || 60;
+        });
+        this.addLog('点数をリセットしました。');
+        this.save();
+        this.render();
+      }
+
+      addLog(text) {
+        const now = new Date();
+        const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        this.state.logs.push(`[${timeStr}] ${text}`);
+        if (this.state.logs.length > 30) this.state.logs.shift();
+      }
+
+      // --- Modal & Settings ---
+
+      openSettings() {
+        document.getElementById('playerCount').value = this.state.players.length;
+        document.getElementById('defaultScore').value = this.state.defaultScore;
+
+        const radios = document.querySelectorAll('input[name="fractionRule"]');
+        radios.forEach(r => {
+          r.checked = (r.value === this.state.fractionRule);
+        });
+
+        this.renderPlayerInputs();
+        document.getElementById('settingsModal').classList.add('active');
+      }
+
+      closeSettings() {
+        document.getElementById('settingsModal').classList.remove('active');
+      }
+
+      renderPlayerInputs() {
+        const count = parseInt(document.getElementById('playerCount').value, 10);
+        const container = document.getElementById('playerInputs');
+        container.innerHTML = '';
+
+        for (let i = 0; i < count; i++) {
+          const existingName = this.state.players[i] ? this.state.players[i].name : `プレイヤー${i + 1}`;
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-control player-name-input';
+          input.value = existingName;
+          input.placeholder = `プレイヤー ${i + 1}`;
+          container.appendChild(input);
+        }
+      }
+
+      saveSettings() {
+        const inputs = document.querySelectorAll('.player-name-input');
+        const defaultScore = parseInt(document.getElementById('defaultScore').value, 10) || 60;
+        const selectedRule = document.querySelector('input[name="fractionRule"]:checked').value;
+
+        const newPlayers = [];
+        inputs.forEach((input, index) => {
+          const name = input.value.trim() || `プレイヤー${index + 1}`;
+          newPlayers.push({
+            id: index + 1,
+            name: name,
+            score: defaultScore
+          });
+        });
+
+        this.state.players = newPlayers;
+        this.state.defaultScore = defaultScore;
+        this.state.fractionRule = selectedRule;
+        this.state.history = [];
+        this.state.winnerId = null;
+        this.state.targetId = null;
+        this.state.logs = ['設定を変更し、新しくゲームを開始しました。'];
+
+        this.save();
+        this.render();
+        this.closeSettings();
+      }
+
+      escapeHtml(str) {
+        return str.replace(/[&<>"']/g, function (m) {
+          return {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+          }[m];
+        });
+      }
+    }
+
+    const app = new DonjaraApp();
+  </script>
+</body>
+
+</html>
