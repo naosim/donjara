@@ -21,6 +21,99 @@
       --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     }
 
+    /* E-Ink (Monochrome High-Contrast) Theme */
+    :root[data-theme="eink"] {
+      --primary: #000000;
+      --primary-hover: #222222;
+      --bg-color: #FFFFFF;
+      --card-bg: #FFFFFF;
+      --text-color: #000000;
+      --text-muted: #222222;
+      --danger: #000000;
+      --danger-hover: #222222;
+      --success: #000000;
+      --accent: #000000;
+      --border-radius: 4px;
+      --shadow: none;
+    }
+
+    [data-theme="eink"] header {
+      border-bottom: 3px solid #000000;
+    }
+
+    [data-theme="eink"] .score-card,
+    [data-theme="eink"] .action-panel,
+    [data-theme="eink"] .log-area,
+    [data-theme="eink"] .modal {
+      border: 2px solid #000000;
+      box-shadow: none;
+    }
+
+    [data-theme="eink"] button {
+      border: 2px solid #000000;
+      font-weight: 700;
+    }
+
+    [data-theme="eink"] .btn-primary {
+      background: #000000;
+      color: #FFFFFF;
+    }
+
+    [data-theme="eink"] .btn-secondary,
+    [data-theme="eink"] .btn-accent,
+    [data-theme="eink"] .btn-danger {
+      background: #FFFFFF;
+      color: #000000;
+      border: 2px solid #000000;
+    }
+
+    [data-theme="eink"] .btn-secondary:hover,
+    [data-theme="eink"] .btn-accent:hover,
+    [data-theme="eink"] .btn-danger:hover {
+      background: #E5E5E5;
+    }
+
+    [data-theme="eink"] .select-btn {
+      background: #FFFFFF;
+      color: #000000;
+      border: 2px solid #000000;
+    }
+
+    [data-theme="eink"] .select-btn.active {
+      background: #000000;
+      color: #FFFFFF;
+      border: 2px solid #000000;
+    }
+
+    [data-theme="eink"] .score-card.selected-winner {
+      background-color: #000000;
+      color: #FFFFFF;
+      border: 3px solid #000000;
+    }
+
+    [data-theme="eink"] .score-card.selected-winner .player-name,
+    [data-theme="eink"] .score-card.selected-winner .player-score {
+      color: #FFFFFF;
+    }
+
+    [data-theme="eink"] .score-card.selected-target {
+      background-color: #E5E5E5;
+      color: #000000;
+      border: 4px double #000000;
+      outline: 2px solid #000000;
+    }
+
+    [data-theme="eink"] .player-score.minus {
+      text-decoration: underline;
+      font-weight: 900;
+    }
+
+    [data-theme="eink"] .form-control,
+    [data-theme="eink"] .point-input,
+    [data-theme="eink"] .radio-label {
+      border: 2px solid #000000;
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
@@ -459,6 +552,26 @@
       </div>
 
       <div class="form-group">
+        <label>表示モード</label>
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" name="themeMode" value="default" checked>
+            <div>
+              <strong>標準カラー</strong>
+              <span class="radio-desc">標準のカラー表示</span>
+            </div>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="themeMode" value="eink">
+            <div>
+              <strong>E-Ink（モノクロ・高コントラスト）</strong>
+              <span class="radio-desc">電子ペーパー端末に最適化した白黒くっきり表示</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
         <label>「全員から」の端数処理ルール</label>
         <div class="radio-group">
           <label class="radio-label">
@@ -501,6 +614,7 @@
           targetId: null,
           paymentType: 'all', // 'all' | 'one'
           fractionRule: 'random', // 'random' | 'reduce' | 'highest'
+          theme: 'default', // 'default' | 'eink'
           defaultScore: 60,
           history: [], // for Undo (stores serialized state of players)
           logs: []
@@ -524,6 +638,7 @@
           this.setDefaultState();
         }
 
+        this.applyTheme();
         this.render();
         if (!saved) {
           this.openSettings();
@@ -533,6 +648,7 @@
       setDefaultState() {
         this.state.defaultScore = 60;
         this.state.fractionRule = 'random';
+        this.state.theme = 'default';
         this.state.players = [
           { id: 1, name: 'プレイヤー1', score: 60 },
           { id: 2, name: 'プレイヤー2', score: 60 },
@@ -543,10 +659,15 @@
         this.state.logs = ['ゲームを開始しました。'];
       }
 
+      applyTheme() {
+        document.documentElement.setAttribute('data-theme', this.state.theme || 'default');
+      }
+
       save() {
         const dataToSave = {
           players: this.state.players,
           fractionRule: this.state.fractionRule,
+          theme: this.state.theme,
           defaultScore: this.state.defaultScore,
           history: this.state.history,
           logs: this.state.logs
@@ -570,12 +691,22 @@
         const sb = document.getElementById('scoreboard');
         sb.innerHTML = '';
         this.state.players.forEach(p => {
+          const isWinner = this.state.winnerId === p.id;
+          const isTarget = this.state.targetId === p.id;
           const card = document.createElement('div');
-          card.className = `score-card ${this.state.winnerId === p.id ? 'selected-winner' : ''} ${this.state.targetId === p.id ? 'selected-target' : ''}`;
+          card.className = `score-card ${isWinner ? 'selected-winner' : ''} ${isTarget ? 'selected-target' : ''}`;
           card.onclick = () => this.selectWinner(p.id);
 
           const scoreClass = p.score < 0 ? 'player-score minus' : 'player-score';
+          let statusBadge = '';
+          if (isWinner) {
+            statusBadge = '<div style="font-size:0.75rem; font-weight:800; margin-bottom:2px;">[ 勝利者 ]</div>';
+          } else if (isTarget) {
+            statusBadge = '<div style="font-size:0.75rem; font-weight:800; margin-bottom:2px;">[ 支払い主 ]</div>';
+          }
+
           card.innerHTML = `
+                        ${statusBadge}
                         <div class="player-name">${this.escapeHtml(p.name)}</div>
                         <div class="${scoreClass}">${p.score}</div>
                     `;
@@ -819,9 +950,14 @@
         document.getElementById('playerCount').value = this.state.players.length;
         document.getElementById('defaultScore').value = this.state.defaultScore;
 
-        const radios = document.querySelectorAll('input[name="fractionRule"]');
-        radios.forEach(r => {
+        const fractionRadios = document.querySelectorAll('input[name="fractionRule"]');
+        fractionRadios.forEach(r => {
           r.checked = (r.value === this.state.fractionRule);
+        });
+
+        const themeRadios = document.querySelectorAll('input[name="themeMode"]');
+        themeRadios.forEach(r => {
+          r.checked = (r.value === (this.state.theme || 'default'));
         });
 
         this.renderPlayerInputs();
@@ -852,6 +988,7 @@
         const inputs = document.querySelectorAll('.player-name-input');
         const defaultScore = parseInt(document.getElementById('defaultScore').value, 10) || 60;
         const selectedRule = document.querySelector('input[name="fractionRule"]:checked').value;
+        const selectedTheme = document.querySelector('input[name="themeMode"]:checked').value;
 
         const newPlayers = [];
         inputs.forEach((input, index) => {
@@ -866,11 +1003,13 @@
         this.state.players = newPlayers;
         this.state.defaultScore = defaultScore;
         this.state.fractionRule = selectedRule;
+        this.state.theme = selectedTheme;
         this.state.history = [];
         this.state.winnerId = null;
         this.state.targetId = null;
         this.state.logs = ['設定を変更し、新しくゲームを開始しました。'];
 
+        this.applyTheme();
         this.save();
         this.render();
         this.closeSettings();
