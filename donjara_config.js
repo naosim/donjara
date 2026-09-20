@@ -17,8 +17,33 @@ window.DONJARA_MOTIFS = [
  * isSatisfied() に渡す判定コンテキスト。
  *
  * @typedef {object} YakuSatisfiedContext
- * @property {Array<object>} groups ソート済みの3枚組一覧。各組のcardsも牌ソート順に並ぶ。
+ * @property {Array<YakuGroup>} groups ソート済みの3枚組一覧。通常は3要素で、各要素のcardsも牌ソート順に並ぶ。
  * @property {number} jokersUsed あがり形で使用したジョーカーの枚数。
+ */
+
+/**
+ * あがり形を構成する1つの3枚組。
+ *
+ * @typedef {object} YakuGroup
+ * @property {string} motif 3枚組として扱う柄ID。ジョーカーを含む場合も、割り当てられた柄IDを持つ。
+ * @property {Array<YakuCard>} cards 3枚組を構成する牌。牌ソート順に並んだ3枚の一覧。
+ */
+
+/**
+ * YakuGroup.cards に入る牌オブジェクト。
+ *
+ * 通常牌は motif と variant で柄とバリエーションを識別する。
+ * ジョーカーは wild がtrueで、variantなどを持たない。
+ *
+ * @typedef {object} YakuCard
+ * @property {number} id 牌の一意なID。
+ * @property {string} motif 牌の柄ID。ジョーカーの場合はwild。
+ * @property {number} [variant] 通常牌のバリエーション番号。
+ * @property {number} [sortOrder] 柄のソート順。
+ * @property {string} [variantLabel] バリエーション表示ラベル。
+ * @property {string} emoji 牌の絵文字。
+ * @property {string} label 画面表示用のラベル。
+ * @property {boolean} wild ジョーカーならtrue、通常牌ならfalse。
  */
 
 /**
@@ -35,12 +60,14 @@ class Yaku {
    * @param {string} name 役名。
    * @param {number} points 役の点数。
    * @param {'agari'|'addition'} type 役の種類。
+   * @param {string} description 役の成立条件の説明。
    */
-  constructor(id, name, points, type) {
+  constructor(id, name, points, type, description) {
     this.id = id;
     this.name = name;
     this.points = points;
     this.type = type;
+    this.description = description;
   }
 
   /**
@@ -62,17 +89,23 @@ class Yaku {
    * @returns {boolean} この役でリーチ可能ならtrue。
    */
   isRiichi(cards, context = {}) {
-    throw new Error(`${this.name} は isRiichi() を実装してください`);
+    return typeof context.isTenpai === 'function' && context.isTenpai(cards);
   }
 
   result() {
-    return { id: this.id, name: this.name, pts: this.points, type: this.type };
+    return {
+      id: this.id,
+      name: this.name,
+      pts: this.points,
+      type: this.type,
+      description: this.description
+    };
   }
 }
 
 class BasicYaku extends Yaku {
   constructor() {
-    super('basic', '基本', 10, 'agari');
+    super('basic', '基本', 10, 'agari', '3枚組を3組そろえる');
   }
 
   /**
@@ -84,15 +117,11 @@ class BasicYaku extends Yaku {
     return Array.isArray(cards) && cards.length === 9 &&
       Array.isArray(context.groups) && context.groups.length === 3;
   }
-
-  isRiichi(cards, context = {}) {
-    return typeof context.isTenpai === 'function' && context.isTenpai(cards);
-  }
 }
 
 class AllSameMotifYaku extends Yaku {
   constructor() {
-    super('all_same_motif', '全組同柄', 20, 'agari');
+    super('all_same_motif', '全組同柄', 20, 'agari', '3組がすべて同じ柄');
   }
 
   /**
@@ -103,15 +132,11 @@ class AllSameMotifYaku extends Yaku {
   isSatisfied(cards, context = {}) {
     return new Set((context.groups || []).map((group) => group.motif)).size === 1;
   }
-
-  isRiichi(cards, context = {}) {
-    return typeof context.isTenpai === 'function' && context.isTenpai(cards);
-  }
 }
 
 class AllDifferentMotifYaku extends Yaku {
   constructor() {
-    super('all_different_motif', '全組異柄', 10, 'agari');
+    super('all_different_motif', '全組異柄', 10, 'agari', '3組の柄がすべて異なる');
   }
 
   /**
@@ -122,15 +147,11 @@ class AllDifferentMotifYaku extends Yaku {
   isSatisfied(cards, context = {}) {
     return new Set((context.groups || []).map((group) => group.motif)).size === 3;
   }
-
-  isRiichi(cards, context = {}) {
-    return typeof context.isTenpai === 'function' && context.isTenpai(cards);
-  }
 }
 
 class NoWildYaku extends Yaku {
   constructor() {
-    super('no_wild', 'ジョーカー不使用', 5, 'addition');
+    super('no_wild', 'ジョーカー不使用', 5, 'addition', 'ジョーカーを使わずにあがる');
   }
 
   /**
@@ -141,15 +162,11 @@ class NoWildYaku extends Yaku {
   isSatisfied(cards, context = {}) {
     return cards.every((card) => !card.wild);
   }
-
-  isRiichi(cards, context = {}) {
-    return typeof context.isTenpai === 'function' && context.isTenpai(cards);
-  }
 }
 
 class IppatsuYaku extends Yaku {
   constructor() {
-    super('ippatsu', 'リーチ一発', 10, 'addition');
+    super('ippatsu', 'リーチ一発', 10, 'addition', 'リーチ直後の相手の捨て牌または次の自分のツモであがる');
   }
 
   /**
@@ -160,9 +177,46 @@ class IppatsuYaku extends Yaku {
   isSatisfied(cards, context = {}) {
     return context.ippatsu === true;
   }
+}
 
-  isRiichi(cards, context = {}) {
-    return false;
+class AllStarsYaku extends Yaku {
+  constructor() {
+    super('allstars', 'オールスター', 60, 'agari', '猫・兎・犬の3組をそろえる');
+  }
+
+  /**
+   * @param {Array<object>} cards ソート済みの判定対象牌一覧。
+   * @param {YakuSatisfiedContext} context ippatsuがtrueなら成立。
+   * @returns {boolean} リーチ一発の条件を満たしていればtrue。
+   */
+  isSatisfied(cards, context = {}) {
+    var hasNeko = hasUsagi = hasInu = false;
+    var groups = new Set();
+    (context.groups || []).forEach(group => groups.add(group.motif));
+    return groups.has("neko") && groups.has("usagi") && groups.has("inu")
+  }
+}
+
+class SuperAllStarsYaku extends Yaku {
+  constructor() {
+    super('superallstars', 'スーパーオールスター', 60, 'agari', 'オールスターの条件に加えて各柄の特別牌をそろえる');
+    this.allstarsYaku = new AllStarsYaku();
+  }
+
+  /**
+   * @param {Array<object>} cards ソート済みの判定対象牌一覧。
+   * @param {YakuSatisfiedContext} context ippatsuがtrueなら成立。
+   * @returns {boolean} リーチ一発の条件を満たしていればtrue。
+   */
+  isSatisfied(cards, context = {}) {
+    if(!this.allstarsYaku.isSatisfied(cards, context)) {
+      return false;
+    }
+    var groups = {neko:false, inu:false, usagi:false};
+    (context.groups || []).forEach(group => group.cards.filter(card => card.variant == 2 || card.wild).forEach(card => {
+      groups[card.motif] = true;
+    }));
+    return Object.values(groups).map(v => v).length == 3;
   }
 }
 
@@ -200,7 +254,9 @@ window.DONJARA_YAKU_CLASSES = {
   AllSameMotifYaku,
   AllDifferentMotifYaku,
   NoWildYaku,
-  IppatsuYaku
+  IppatsuYaku,
+  AllStarsYaku,
+  SuperAllStarsYaku,
 };
 window.Yaku = Yaku;
 window.YakuManager = YakuManager;
