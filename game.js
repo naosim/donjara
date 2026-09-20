@@ -1146,11 +1146,7 @@ if (typeof module !== 'undefined' && module.exports) {
     isTenpai,
     scoreYaku,
     Yaku: window.Yaku,
-    BasicYaku: window.DONJARA_YAKU_CLASSES.BasicYaku,
-    AllSameMotifYaku: window.DONJARA_YAKU_CLASSES.AllSameMotifYaku,
-    AllDifferentMotifYaku: window.DONJARA_YAKU_CLASSES.AllDifferentMotifYaku,
-    NoWildYaku: window.DONJARA_YAKU_CLASSES.NoWildYaku,
-    IppatsuYaku: window.DONJARA_YAKU_CLASSES.IppatsuYaku,
+    ...window.DONJARA_YAKU_CLASSES,
     YakuManager: window.YakuManager,
     DonjaraAI,
     DonjaraGame

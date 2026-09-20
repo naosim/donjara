@@ -650,6 +650,72 @@
       line-height: 1.6;
       margin-bottom: 16px;
     }
+
+    /* Yaku List */
+    .yaku-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin-top: 8px;
+      text-align: left;
+    }
+
+    .yaku-table th {
+      padding: 6px 6px;
+      border-bottom: 2px solid #E5E7EB;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .yaku-table td {
+      padding: 9px 6px;
+      border-bottom: 1px solid #F3F4F6;
+      vertical-align: top;
+    }
+
+    .yaku-pts {
+      font-weight: 800;
+      color: var(--primary);
+      white-space: nowrap;
+    }
+
+    .yaku-type-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      margin-top: 3px;
+    }
+
+    .yaku-type-agari  { background: #EEF2FF; color: var(--primary); }
+    .yaku-type-addition { background: #FEF3C7; color: #D97706; }
+
+    [data-theme="eink"] .yaku-pts { color: #000; }
+    [data-theme="eink"] .yaku-type-agari,
+    [data-theme="eink"] .yaku-type-addition {
+      background: #E5E5E5;
+      color: #000;
+      border: 1px solid #000;
+    }
+
+    .yaku-modal-card {
+      background: white;
+      width: 100%;
+      max-width: 480px;
+      border-radius: var(--border-radius);
+      padding: 16px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    [data-theme="eink"] .yaku-modal-card {
+      border: 3px solid #000000;
+      box-shadow: none;
+    }
   </style>
   <script src="qrcode.js?v=15"></script>
   <script src="p2p.js?v=15"></script>
@@ -662,6 +728,7 @@
   <header>
     <h1>🎴 ドンジャラ対局 <span style="font-size:0.75rem; font-weight:normal;">(Step 2)</span></h1>
     <div class="header-btns">
+      <button class="btn-secondary" id="yakuListBtn" onclick="app.openYakuList()">📋 役一覧</button>
       <button class="btn-secondary" onclick="app.showShareQR()">🔗 URL QR</button>
       <button class="btn-secondary" onclick="location.href='chat.html'">💬 チャット</button>
       <button class="btn-secondary" onclick="app.toggleTheme()">🌓 E-Ink</button>
@@ -818,6 +885,24 @@
       </div>
 
       <button class="btn-secondary" style="width: 100%;" onclick="app.closeShareModal()">閉じる</button>
+    </div>
+  </div>
+
+  <!-- Yaku List Modal -->
+  <div class="modal-overlay" id="yakuListModal">
+    <div class="yaku-modal-card">
+      <h3 style="font-size:1.1rem; margin-bottom: 12px;">🀄 役一覧</h3>
+      <table class="yaku-table">
+        <thead>
+          <tr>
+            <th>役名</th>
+            <th>点数</th>
+            <th>成立条件</th>
+          </tr>
+        </thead>
+        <tbody id="yakuListBody"></tbody>
+      </table>
+      <button class="btn-secondary" style="width: 100%; margin-top: 16px;" onclick="app.closeYakuList()">閉じる</button>
     </div>
   </div>
 
@@ -1104,6 +1189,32 @@
 
       closeShareModal() {
         const modal = document.getElementById('shareModal');
+        if (modal) modal.classList.remove('active');
+      }
+
+      openYakuList() {
+        const tbody = document.getElementById('yakuListBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        const yakuClasses = window.DONJARA_YAKU_CLASSES || {};
+        Object.values(yakuClasses).forEach(cls => {
+          const yaku = new cls();
+          const tr = document.createElement('tr');
+          const typeLabel = yaku.type === 'agari' ? 'あがり役' : '付加役';
+          const typeCls = yaku.type === 'agari' ? 'yaku-type-agari' : 'yaku-type-addition';
+          tr.innerHTML = `
+            <td><strong>${yaku.name}</strong><br><span class="yaku-type-badge ${typeCls}">${typeLabel}</span></td>
+            <td class="yaku-pts">${yaku.points}pt</td>
+            <td style="font-size:0.82rem; color:var(--text-muted);">${yaku.description}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+        const modal = document.getElementById('yakuListModal');
+        if (modal) modal.classList.add('active');
+      }
+
+      closeYakuList() {
+        const modal = document.getElementById('yakuListModal');
         if (modal) modal.classList.remove('active');
       }
 

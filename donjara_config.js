@@ -2,15 +2,15 @@
 // sortOrder が小さい柄ほど先に並ぶ。variants は number の昇順で定義する。
 // バリエーションを追加する場合は variants に { number, count, label } を追加する。
 window.DONJARA_MOTIFS = [
-  { id: 'neko',    sortOrder: 1, emoji: '🐱', label: '猫', variants: [{ number: 1, count: 7, label: '' }, { number: 2, count: 3, label: '🌟' }] },
-  { id: 'usagi',   sortOrder: 2, emoji: '🐰', label: '兎', variants: [{ number: 1, count: 7, label: '' }, { number: 2, count: 3, label: '🌟' }] },
-  { id: 'inu',     sortOrder: 3, emoji: '🐶', label: '犬', variants: [{ number: 1, count: 7, label: '' }, { number: 2, count: 3, label: '🌟' }] },
-  { id: 'kaeru',   sortOrder: 4, emoji: '🐸', label: '蛙', variants: [{ number: 1, count: 3, label: '🧺' }, { number: 2, count: 3, label: '🍜' }, { number: 3, count: 3, label: '🚕' }] },
-  { id: 'sakana',  sortOrder: 5, emoji: '🐟', label: '魚', variants: [{ number: 1, count: 8, label: '' }, { number: 2, count: 1, label: '🌟' }] },
+  { id: 'neko', sortOrder: 1, emoji: '🐱', label: '猫', variants: [{ number: 1, count: 7, label: '' }, { number: 2, count: 3, label: '🌟' }] },
+  { id: 'usagi', sortOrder: 2, emoji: '🐰', label: '兎', variants: [{ number: 1, count: 7, label: '' }, { number: 2, count: 3, label: '🌟' }] },
+  { id: 'inu', sortOrder: 3, emoji: '🐶', label: '犬', variants: [{ number: 1, count: 7, label: '' }, { number: 2, count: 3, label: '🌟' }] },
+  { id: 'kaeru', sortOrder: 4, emoji: '🐸', label: '蛙', variants: [{ number: 1, count: 3, label: '🧺' }, { number: 2, count: 3, label: '🍜' }, { number: 3, count: 3, label: '🚕' }] },
+  { id: 'sakana', sortOrder: 5, emoji: '🐟', label: '魚', variants: [{ number: 1, count: 8, label: '' }, { number: 2, count: 1, label: '🌟' }] },
   { id: 'kitsune', sortOrder: 6, emoji: '🦊', label: '狐', variants: [{ number: 1, count: 9, label: '' }] },
-  { id: 'panda',   sortOrder: 7, emoji: '🐼', label: 'パンダ', variants: [{ number: 1, count: 9, label: '' }] },
-  { id: 'buta',    sortOrder: 8, emoji: '🐷', label: '豚', variants: [{ number: 1, count: 9, label: '' }] },
-  { id: 'tori',    sortOrder: 9, emoji: '🐔', label: '鳥', variants: [{ number: 1, count: 9, label: '' }] },
+  { id: 'panda', sortOrder: 7, emoji: '🐼', label: 'パンダ', variants: [{ number: 1, count: 9, label: '' }] },
+  { id: 'buta', sortOrder: 8, emoji: '🐷', label: '豚', variants: [{ number: 1, count: 9, label: '' }] },
+  { id: 'tori', sortOrder: 9, emoji: '🐔', label: '鳥', variants: [{ number: 1, count: 9, label: '' }] },
 ];
 
 /**
@@ -119,24 +119,9 @@ class BasicYaku extends Yaku {
   }
 }
 
-class AllSameMotifYaku extends Yaku {
+class SixYaku extends Yaku {
   constructor() {
-    super('all_same_motif', '全組同柄', 20, 'agari', '3組がすべて同じ柄');
-  }
-
-  /**
-  * @param {Array<object>} cards ソート済みの判定対象牌一覧。柄の判定はcontext.groupsを使用する。
-  * @param {YakuSatisfiedContext} context あがり形の判定結果。groupsに各組の柄を含む。
-   * @returns {boolean} 3組がすべて同じ柄ならtrue。
-   */
-  isSatisfied(cards, context = {}) {
-    return new Set((context.groups || []).map((group) => group.motif)).size === 1;
-  }
-}
-
-class AllDifferentMotifYaku extends Yaku {
-  constructor() {
-    super('all_different_motif', '全組異柄', 10, 'agari', '3組の柄がすべて異なる');
+    super('six', '六揃い', 30, 'agari', '2種類の絵柄で構成');
   }
 
   /**
@@ -145,24 +130,10 @@ class AllDifferentMotifYaku extends Yaku {
    * @returns {boolean} 3組の柄がすべて異なればtrue。
    */
   isSatisfied(cards, context = {}) {
-    return new Set((context.groups || []).map((group) => group.motif)).size === 3;
+    return new Set((context.groups || []).map((group) => group.motif)).size === 2;
   }
 }
 
-class NoWildYaku extends Yaku {
-  constructor() {
-    super('no_wild', 'ジョーカー不使用', 5, 'addition', 'ジョーカーを使わずにあがる');
-  }
-
-  /**
-  * @param {Array<object>} cards ソート済みの判定対象牌一覧。
-  * @param {YakuSatisfiedContext} context この役では使用しない判定補助情報。
-   * @returns {boolean} ジョーカーを1枚も含まなければtrue。
-   */
-  isSatisfied(cards, context = {}) {
-    return cards.every((card) => !card.wild);
-  }
-}
 
 class IppatsuYaku extends Yaku {
   constructor() {
@@ -179,9 +150,61 @@ class IppatsuYaku extends Yaku {
   }
 }
 
-class AllStarsYaku extends Yaku {
+class HaYaku extends Yaku {
   constructor() {
-    super('allstars', 'オールスター', 60, 'agari', '猫・兎・犬の3組をそろえる');
+    super('ha', 'はー', 36, 'agari', '🐼・🐱・🐶の3組をそろえる');
+  }
+
+  /**
+   * @param {Array<object>} cards ソート済みの判定対象牌一覧。
+   * @param {YakuSatisfiedContext} context あがり形の判定結果。groupsに各組の柄を含む。
+   * @returns {boolean} descriptionに書かれた条件を満たせばtrue。
+   */
+  isSatisfied(cards, context = {}) {
+    var groups = new Set();
+    (context.groups || []).forEach(group => groups.add(group.motif));
+    return groups.has("panda") && groups.has("neko") && groups.has("inu");
+  }
+}
+
+
+class NantokaYaku extends Yaku {
+  constructor() {
+    super('nantoka', 'なんとかなれ', 42, 'agari', '🐶・🐟・（🐱または🐰）3組をそろえる');
+  }
+
+  /**
+   * @param {Array<object>} cards ソート済みの判定対象牌一覧。
+   * @param {YakuSatisfiedContext} context あがり形の判定結果。groupsに各組の柄を含む。
+   * @returns {boolean} descriptionに書かれた条件を満たせばtrue。
+   */
+  isSatisfied(cards, context = {}) {
+    var groups = new Set();
+    (context.groups || []).forEach(group => groups.add(group.motif));
+    return groups.has("inu") && groups.has("sakana") && (groups.has("neko") || groups.has("usagi"));
+  }
+}
+
+class FightingYaku extends Yaku {
+  constructor() {
+    super('fighting', '戦い', 54, 'agari', '🦊・🐷・🐸の3組をそろえる');
+  }
+
+  /**
+   * @param {Array<object>} cards ソート済みの判定対象牌一覧。
+   * @param {YakuSatisfiedContext} context あがり形の判定結果。groupsに各組の柄を含む。
+   * @returns {boolean} descriptionに書かれた条件を満たせばtrue。
+   */
+  isSatisfied(cards, context = {}) {
+    var groups = new Set();
+    (context.groups || []).forEach(group => groups.add(group.motif));
+    return groups.has("kitsune") && groups.has("buta") && groups.has("kaeru")
+  }
+}
+
+class StudyingYaku extends Yaku {
+  constructor() {
+    super('studying', 'お勉強', 54, 'agari', '🐱・🐰・🦊の3組をそろえる');
   }
 
   /**
@@ -190,7 +213,23 @@ class AllStarsYaku extends Yaku {
    * @returns {boolean} リーチ一発の条件を満たしていればtrue。
    */
   isSatisfied(cards, context = {}) {
-    var hasNeko = hasUsagi = hasInu = false;
+    var groups = new Set();
+    (context.groups || []).forEach(group => groups.add(group.motif));
+    return groups.has("neko") && groups.has("usagi") && groups.has("kitsune")
+  }
+}
+
+class AllStarsYaku extends Yaku {
+  constructor() {
+    super('allstars', 'オールスター', 60, 'agari', '🐱・🐰・🐶の3組をそろえる');
+  }
+
+  /**
+   * @param {Array<object>} cards ソート済みの判定対象牌一覧。
+   * @param {YakuSatisfiedContext} context ippatsuがtrueなら成立。
+   * @returns {boolean} リーチ一発の条件を満たしていればtrue。
+   */
+  isSatisfied(cards, context = {}) {
     var groups = new Set();
     (context.groups || []).forEach(group => groups.add(group.motif));
     return groups.has("neko") && groups.has("usagi") && groups.has("inu")
@@ -199,7 +238,7 @@ class AllStarsYaku extends Yaku {
 
 class SuperAllStarsYaku extends Yaku {
   constructor() {
-    super('superallstars', 'スーパーオールスター', 60, 'agari', 'オールスターの条件に加えて各柄の特別牌をそろえる');
+    super('superallstars', 'スーパーオールスター', 120, 'agari', 'オールスターの条件に加えて各柄の特別牌をそろえる');
     this.allstarsYaku = new AllStarsYaku();
   }
 
@@ -209,10 +248,10 @@ class SuperAllStarsYaku extends Yaku {
    * @returns {boolean} リーチ一発の条件を満たしていればtrue。
    */
   isSatisfied(cards, context = {}) {
-    if(!this.allstarsYaku.isSatisfied(cards, context)) {
+    if (!this.allstarsYaku.isSatisfied(cards, context)) {
       return false;
     }
-    var groups = {neko:false, inu:false, usagi:false};
+    var groups = { neko: false, inu: false, usagi: false };
     (context.groups || []).forEach(group => group.cards.filter(card => card.variant == 2 || card.wild).forEach(card => {
       groups[card.motif] = true;
     }));
@@ -248,15 +287,17 @@ class YakuManager {
   }
 }
 
-window.DONJARA_YAKUS = [BasicYaku, AllSameMotifYaku, AllDifferentMotifYaku, NoWildYaku, IppatsuYaku];
 window.DONJARA_YAKU_CLASSES = {
   BasicYaku,
-  AllSameMotifYaku,
-  AllDifferentMotifYaku,
-  NoWildYaku,
-  IppatsuYaku,
+  SixYaku,
+  HaYaku,
+  NantokaYaku,
+  FightingYaku,
+  StudyingYaku,
   AllStarsYaku,
   SuperAllStarsYaku,
+  IppatsuYaku,
 };
+window.DONJARA_YAKUS = Object.values(window.DONJARA_YAKU_CLASSES);
 window.Yaku = Yaku;
 window.YakuManager = YakuManager;
