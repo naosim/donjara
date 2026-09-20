@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ドンジャラ P2P チャット (Step 1)</title>
+  <title>ドンジャラ WebRTC オフライン P2P チャット (Step 1)</title>
   <style>
     :root {
       --primary: #4F46E5;
@@ -70,7 +70,7 @@
     }
 
     h1 {
-      font-size: 1.3rem;
+      font-size: 1.25rem;
       font-weight: 800;
       color: var(--primary);
     }
@@ -149,7 +149,6 @@
       border: 2px solid #000000;
     }
 
-    /* Panel Card */
     .card {
       background: var(--card-bg);
       border-radius: var(--border-radius);
@@ -164,7 +163,6 @@
       box-shadow: none;
     }
 
-    /* Status Bar */
     .status-bar {
       display: flex;
       align-items: center;
@@ -219,7 +217,6 @@
       color: #FFFFFF;
     }
 
-    /* Form Controls */
     .form-group {
       margin-bottom: 12px;
     }
@@ -237,12 +234,15 @@
       padding: 10px 12px;
       border: 1px solid #D1D5DB;
       border-radius: 8px;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       outline: none;
     }
 
-    .form-control:focus {
-      border-color: var(--primary);
+    textarea.form-control {
+      resize: vertical;
+      min-height: 70px;
+      font-family: monospace;
+      font-size: 0.8rem;
     }
 
     [data-theme="eink"] .form-control {
@@ -256,6 +256,26 @@
       margin-top: 8px;
     }
 
+    .step-box {
+      border: 1px solid #E5E7EB;
+      padding: 12px;
+      border-radius: 8px;
+      background: #F9FAFB;
+      margin-bottom: 12px;
+    }
+
+    [data-theme="eink"] .step-box {
+      border: 2px solid #000000;
+      background: #FFFFFF;
+    }
+
+    .step-title {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 8px;
+    }
+
     /* Chat Area */
     .chat-container {
       display: flex;
@@ -266,7 +286,7 @@
 
     .chat-logs {
       flex: 1;
-      max-height: 380px;
+      max-height: 320px;
       overflow-y: auto;
       padding: 12px;
       background: #F9FAFB;
@@ -289,7 +309,6 @@
       border-radius: 12px;
       font-size: 0.95rem;
       line-height: 1.4;
-      position: relative;
       word-break: break-word;
     }
 
@@ -353,7 +372,6 @@
       flex: 1;
     }
 
-    /* Alert / Guide Box */
     .alert-box {
       background: #EFF6FF;
       border: 1px solid #BFDBFE;
@@ -370,15 +388,27 @@
       border: 2px solid #000000;
       color: #000000;
     }
+
+    .code-display {
+      position: relative;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      padding: 4px 8px;
+      font-size: 0.75rem;
+    }
   </style>
 </head>
 
 <body>
 
   <header>
-    <h1>ドンジャラ P2P チャット <span style="font-size:0.8rem; font-weight:normal;">(Step 1)</span></h1>
+    <h1>ドンジャラ WebRTC オフライン P2P <span style="font-size:0.8rem; font-weight:normal;">(Step 1)</span></h1>
     <div class="header-btns">
-      <button class="btn-secondary" id="themeToggleBtn" onclick="app.toggleTheme()">🌓 E-Ink切替</button>
+      <button class="btn-secondary" onclick="app.toggleTheme()">🌓 E-Ink切替</button>
     </div>
   </header>
 
@@ -391,7 +421,7 @@
     <div id="roleDisplay" style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted);">役割: 未選択</div>
   </div>
 
-  <!-- Connection Controls Card -->
+  <!-- User Setup & Role Card -->
   <div class="card">
     <div class="form-group">
       <label for="userNameInput">あなたのニックネーム</label>
@@ -399,8 +429,8 @@
     </div>
 
     <div class="btn-grid">
-      <button class="btn-primary" id="hostBtn" onclick="app.startHost()">📱 親機として待機 (Host)</button>
-      <button class="btn-primary" id="guestBtn" onclick="app.connectGuest()">🔍 子機として接続 (Guest)</button>
+      <button class="btn-primary" id="hostModeBtn" onclick="app.setupHostMode()">📱 親機モード (Host)</button>
+      <button class="btn-primary" id="guestModeBtn" onclick="app.setupGuestMode()">🔍 子機モード (Guest)</button>
     </div>
 
     <div style="margin-top: 10px; display: flex; gap: 8px;">
@@ -409,18 +439,54 @@
     </div>
   </div>
 
-  <!-- Web Bluetooth Alert Guide -->
-  <div class="alert-box" id="guideBox">
-    💡 <strong>Web Bluetooth 接続のヒント:</strong><br>
-    ・完全オフライン（電波圏外）でも動作可能です。<br>
-    ・親機（Host）で「親機として待機」を押し、子機（Guest）で「子機として接続」を押して対象端末を選択してください。<br>
-    ・単一端末でテストする場合は「🧪 テスト模擬通信」ボタンで通信挙動を確認できます。
+  <!-- Connection Panel for Host -->
+  <div class="card" id="hostPanel" style="display: none;">
+    <div class="step-title">【親機の手順 1/2】 招待コードを発行</div>
+    <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">以下の「招待コード」をコピーして子機（もう片方の端末）に渡してください。</p>
+    <div class="form-group code-display">
+      <textarea id="hostOfferCode" class="form-control" readonly placeholder="招待コード生成中..."></textarea>
+      <button class="btn-secondary copy-btn" onclick="app.copyCode('hostOfferCode')">📋 コピー</button>
+    </div>
+
+    <div class="step-title" style="margin-top: 16px;">【親機の手順 2/2】 子機からの応答コードを入力</div>
+    <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">子機から受け取った「応答コード」を貼り付けて接続を完了してください。</p>
+    <div class="form-group">
+      <textarea id="hostAnswerInput" class="form-control" placeholder="子機からの応答コードをここに貼り付け..."></textarea>
+    </div>
+    <button class="btn-primary" style="width: 100%;" onclick="app.acceptGuestAnswer()">接続を完了する (親機)</button>
+  </div>
+
+  <!-- Connection Panel for Guest -->
+  <div class="card" id="guestPanel" style="display: none;">
+    <div class="step-title">【子機の手順 1/2】 親機の招待コードを入力</div>
+    <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">親機から受け取った「招待コード」をここに貼り付けてください。</p>
+    <div class="form-group">
+      <textarea id="guestOfferInput" class="form-control" placeholder="親機の招待コードをここに貼り付け..."></textarea>
+    </div>
+    <button class="btn-primary" style="width: 100%; margin-bottom: 16px;" onclick="app.createGuestAnswer()">応答コードを発行する (子機)</button>
+
+    <div id="guestAnswerSection" style="display: none;">
+      <div class="step-title">【子機の手順 2/2】 応答コードを親機に渡す</div>
+      <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">生成された以下の「応答コード」をコピーして親機に入力してもらってください。</p>
+      <div class="form-group code-display">
+        <textarea id="guestAnswerCode" class="form-control" readonly placeholder="応答コード生成中..."></textarea>
+        <button class="btn-secondary copy-btn" onclick="app.copyCode('guestAnswerCode')">📋 コピー</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connection Guide -->
+  <div class="alert-box">
+    🌐 <strong>完全オフライン (ネット不要) P2P接続のやり方:</strong><br>
+    1. 1台目を「親機モード」にして表示される **招待コード** をコピーします。<br>
+    2. 2台目を「子機モード」にして招待コードを貼り付け、**応答コード** を発行してコピーします。<br>
+    3. 親機に応答コードを貼り付けると **ダイレクトP2P接続が完了** し、自由にチャットできます！
   </div>
 
   <!-- Chat Log & Input Area -->
   <div class="card chat-container">
     <div class="chat-logs" id="chatLogs">
-      <div class="message-bubble system">P2Pチャットが初期化されました。親機または子機として接続を開始してください。</div>
+      <div class="message-bubble system">P2Pチャットが初期化されました。親機モードまたは子機モードを選択してください。</div>
     </div>
 
     <div class="chat-input-row">
@@ -430,31 +496,23 @@
   </div>
 
   <script>
-    class P2PChatApp {
+    class WebRTCP2PChat {
       constructor() {
-        // Bluetooth UUIDs for Custom Service & Characteristic
-        this.SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0';
-        this.CHARACTERISTIC_UUID = '12345678-1234-5678-1234-56789abcdef1';
-
         this.state = {
           role: 'none', // 'none' | 'host' | 'guest'
           status: 'disconnected', // 'disconnected' | 'connecting' | 'connected' | 'error'
           theme: 'default',
           userName: 'プレイヤー1',
-          simulationMode: false,
-          bluetoothDevice: null,
-          gattServer: null,
-          characteristic: null
+          simulationMode: false
         };
 
-        this.encoder = new TextEncoder();
-        this.decoder = new TextDecoder();
+        this.pc = null;
+        this.dataChannel = null;
 
         this.init();
       }
 
       init() {
-        // Load stored theme or user name
         const savedTheme = localStorage.getItem('donjara_chat_theme');
         if (savedTheme) {
           this.state.theme = savedTheme;
@@ -475,7 +533,7 @@
         this.updateUI();
       }
 
-      // --- Theme Management ---
+      // --- Theme & Settings ---
       applyTheme() {
         document.documentElement.setAttribute('data-theme', this.state.theme || 'default');
       }
@@ -486,14 +544,13 @@
         this.applyTheme();
       }
 
-      // --- Simulation Mode ---
       toggleSimulationMode() {
         this.state.simulationMode = !this.state.simulationMode;
         const btn = document.getElementById('simModeBtn');
         if (this.state.simulationMode) {
           btn.classList.replace('btn-secondary', 'btn-accent');
           this.setStatus('connected', 'host');
-          this.addSystemLog('🧪 模擬通信モードが有効化されました。（単一画面で送信動作をテスト可能です）');
+          this.addSystemLog('🧪 模擬通信モードが有効化されました。（単一画面で送信テストが可能です）');
         } else {
           btn.classList.replace('btn-accent', 'btn-secondary');
           this.disconnect();
@@ -501,91 +558,161 @@
         }
       }
 
-      // --- Web Bluetooth logic ---
+      // --- WebRTC PeerConnection Setup ---
+      createPeerConnection() {
+        // Empty iceServers array for complete offline local P2P
+        const config = { iceServers: [] };
+        this.pc = new RTCPeerConnection(config);
 
-      // Host (Server / Advertising)
-      async startHost() {
+        this.pc.oniceconnectionstatechange = () => {
+          console.log('ICE Connection State:', this.pc.iceConnectionState);
+          if (this.pc.iceConnectionState === 'disconnected' || this.pc.iceConnectionState === 'failed') {
+            this.setStatus('disconnected', 'none');
+            this.addSystemLog('通信が切断されました。');
+          }
+        };
+
+        return this.pc;
+      }
+
+      // --- Host Flow ---
+      async setupHostMode() {
         this.state.userName = document.getElementById('userNameInput').value.trim() || '親機';
         this.setStatus('connecting', 'host');
-        this.addSystemLog('親機として待機処理を開始します...');
+        document.getElementById('hostPanel').style.display = 'block';
+        document.getElementById('guestPanel').style.display = 'none';
 
-        if (!navigator.bluetooth) {
-          this.handleBtError('お使いのブラウザは Web Bluetooth に対応していません。Chrome/Edge をご利用ください。');
+        this.addSystemLog('【親機】招待コードを生成中...');
+
+        const pc = this.createPeerConnection();
+
+        // Create DataChannel as Host
+        this.dataChannel = pc.createDataChannel('donjaraData');
+        this.setupDataChannelEvents(this.dataChannel);
+
+        // Gather ICE Candidates & Create Offer
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        // Wait for ICE Gathering to complete for offline payload
+        await this.waitForIceGathering(pc);
+
+        const offerCode = btoa(JSON.stringify(pc.localDescription));
+        document.getElementById('hostOfferCode').value = offerCode;
+        this.addSystemLog('【親機】招待コードの発行が完了しました。コードをコピーして子機に渡してください。');
+      }
+
+      async acceptGuestAnswer() {
+        const answerCode = document.getElementById('hostAnswerInput').value.trim();
+        if (!answerCode) {
+          alert('子機からの応答コードを貼り付けてください。');
           return;
         }
 
         try {
-          if (navigator.bluetooth.requestLEScan) {
-            this.addSystemLog('GATT スキャン/アドバタイズ待機を試行中...');
-          }
-
-          this.addSystemLog('子機からの接続要求を待機しています... (ペアリング準備完了)');
-          this.setStatus('connected', 'host');
-          this.addSystemLog('【親機モード】待機状態になりました。相手端末からの接続を待っています。');
-
+          const answerSdp = JSON.parse(atob(answerCode));
+          await this.pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
+          this.addSystemLog('【親機】子機からの応答コードを受理しました。P2P接続を確定中...');
         } catch (err) {
-          console.error('Host Error:', err);
-          this.handleBtError(`親機起動エラー: ${err.message || err}`);
+          console.error('Accept Answer Error:', err);
+          alert('応答コードの形式が不正です。正しくコピーされているか確認してください。');
         }
       }
 
-      // Guest (Client / Scanner)
-      async connectGuest() {
+      // --- Guest Flow ---
+      async setupGuestMode() {
         this.state.userName = document.getElementById('userNameInput').value.trim() || '子機';
         this.setStatus('connecting', 'guest');
-        this.addSystemLog('周辺の親機デバイスを検索中...');
+        document.getElementById('guestPanel').style.display = 'block';
+        document.getElementById('hostPanel').style.display = 'none';
+        this.addSystemLog('【子機】親機からの招待コードの入力を待っています。');
+      }
 
-        if (!navigator.bluetooth) {
-          this.handleBtError('お使いのブラウザは Web Bluetooth に対応していません。Chrome/Edge をご利用ください。');
+      async createGuestAnswer() {
+        const offerCode = document.getElementById('guestOfferInput').value.trim();
+        if (!offerCode) {
+          alert('親機の招待コードを貼り付けてください。');
           return;
         }
 
         try {
-          // Request Bluetooth Device
-          const device = await navigator.bluetooth.requestDevice({
-            acceptAllDevices: true,
-            optionalServices: [this.SERVICE_UUID]
-          });
+          const offerSdp = JSON.parse(atob(offerCode));
+          const pc = this.createPeerConnection();
 
-          this.state.bluetoothDevice = device;
-          device.addEventListener('gattserverdisconnected', () => this.onDisconnected());
+          // Listen for DataChannel from Host
+          pc.ondatachannel = (event) => {
+            this.dataChannel = event.channel;
+            this.setupDataChannelEvents(this.dataChannel);
+          };
 
-          this.addSystemLog(`デバイス「${device.name || '名称未設定'}」に接続中...`);
-          const server = await device.gatt.connect();
-          this.state.gattServer = server;
+          await pc.setRemoteDescription(new RTCSessionDescription(offerSdp));
 
-          this.addSystemLog('GATT サービスを取得中...');
-          try {
-            const service = await server.getPrimaryService(this.SERVICE_UUID);
-            const characteristic = await service.getCharacteristic(this.CHARACTERISTIC_UUID);
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
 
-            this.state.characteristic = characteristic;
+          // Wait for ICE Gathering
+          await this.waitForIceGathering(pc);
 
-            // Start Notification for receiving messages
-            await characteristic.startNotifications();
-            characteristic.addEventListener('characteristicvaluechanged', (e) => this.onDataReceived(e));
+          const answerCode = btoa(JSON.stringify(pc.localDescription));
+          document.getElementById('guestAnswerCode').value = answerCode;
+          document.getElementById('guestAnswerSection').style.display = 'block';
 
-            this.setStatus('connected', 'guest');
-            this.addSystemLog(`親機「${device.name || '親機'}」と接続が完了しました！`);
-          } catch (serviceErr) {
-            // Fallback for standard demo pairing if service UUID isn't pre-flashed on hardware
-            this.setStatus('connected', 'guest');
-            this.addSystemLog(`親機「${device.name || '親機'}」とペアリング接続完了（標準プロトコル）`);
-          }
-
+          this.addSystemLog('【子機】応答コードを生成しました！このコードをコピーして親機に入力してもらってください。');
         } catch (err) {
-          console.error('Guest Connection Error:', err);
-          if (err.name === 'NotFoundError') {
-            this.addSystemLog('デバイス選択がキャンセルされました。');
-            this.setStatus('disconnected', 'none');
-          } else {
-            this.handleBtError(`接続エラー: ${err.message || err}`);
-          }
+          console.error('Create Answer Error:', err);
+          alert('招待コードの解読に失敗しました。正しくコピーされているか確認してください。');
         }
       }
 
-      // Send Message Packet
-      async sendMessage() {
+      // --- DataChannel Event Handling ---
+      setupDataChannelEvents(channel) {
+        channel.onopen = () => {
+          this.setStatus('connected', this.state.role);
+          this.addSystemLog('🎉 WebRTC P2P 接続がオープンしました！ダイレクトチャットが可能です。');
+        };
+
+        channel.onmessage = (e) => {
+          try {
+            const packet = JSON.parse(e.data);
+            if (packet.type === 'chat') {
+              this.addMessageBubble(packet, false);
+            }
+          } catch (err) {
+            console.error('Data Parse Error:', err);
+          }
+        };
+
+        channel.onclose = () => {
+          this.setStatus('disconnected', 'none');
+          this.addSystemLog('P2P DataChannel が閉じられました。');
+        };
+
+        channel.onerror = (err) => {
+          console.error('DataChannel Error:', err);
+        };
+      }
+
+      // Wait for Complete ICE Gathering for offline copy/paste
+      waitForIceGathering(pc) {
+        return new Promise((resolve) => {
+          if (pc.iceGatheringState === 'complete') {
+            resolve();
+          } else {
+            const checkState = () => {
+              if (pc.iceGatheringState === 'complete') {
+                pc.removeEventListener('icegatheringstatechange', checkState);
+                resolve();
+              }
+            };
+            pc.addEventListener('icegatheringstatechange', checkState);
+            // Fallback timeout after 1.5 seconds if gathering takes long offline
+            setTimeout(resolve, 1500);
+          }
+        });
+      }
+
+      // --- Send Message ---
+      sendMessage() {
         const input = document.getElementById('messageInput');
         const text = input.value.trim();
         if (!text) return;
@@ -598,75 +725,52 @@
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
 
-        // Render locally
         this.addMessageBubble(packet, true);
         input.value = '';
 
-        // If in simulation mode
         if (this.state.simulationMode) {
           setTimeout(() => {
             const echoPacket = {
               type: 'chat',
               sender: this.state.role === 'host' ? '子機(テスト)' : '親機(テスト)',
               role: this.state.role === 'host' ? 'guest' : 'host',
-              text: `[応答テスト] 「${text}」を受け取りました！`,
+              text: `[応答テスト] 「${text}」を受信しました！`,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
             this.addMessageBubble(echoPacket, false);
-          }, 600);
+          }, 500);
           return;
         }
 
-        // Send via Bluetooth Characteristic if connected
-        if (this.state.characteristic) {
-          try {
-            const payload = this.encoder.encode(JSON.stringify(packet));
-            if (this.state.characteristic.writeValueWithResponse) {
-              await this.state.characteristic.writeValueWithResponse(payload);
-            } else {
-              await this.state.characteristic.writeValue(payload);
-            }
-          } catch (err) {
-            console.error('Send Error:', err);
-            this.addSystemLog(`送信失敗: ${err.message}`);
-          }
+        if (this.dataChannel && this.dataChannel.readyState === 'open') {
+          this.dataChannel.send(JSON.stringify(packet));
+        } else {
+          this.addSystemLog('⚠️ 通信チャネルが開いていないためメッセージを送信できません。');
         }
       }
 
-      // Receive Data Event
-      onDataReceived(event) {
-        try {
-          const value = event.target.value;
-          const jsonStr = this.decoder.decode(value);
-          const packet = JSON.parse(jsonStr);
-
-          if (packet.type === 'chat') {
-            this.addMessageBubble(packet, false);
-          }
-        } catch (err) {
-          console.error('Data Parse Error:', err);
-        }
-      }
-
-      // Disconnect
+      // --- Disconnect & Reset ---
       disconnect() {
-        if (this.state.gattServer && this.state.gattServer.connected) {
-          this.state.gattServer.disconnect();
+        if (this.dataChannel) {
+          this.dataChannel.close();
+          this.dataChannel = null;
         }
-        this.onDisconnected();
-      }
-
-      onDisconnected() {
-        this.state.bluetoothDevice = null;
-        this.state.gattServer = null;
-        this.state.characteristic = null;
+        if (this.pc) {
+          this.pc.close();
+          this.pc = null;
+        }
+        document.getElementById('hostPanel').style.display = 'none';
+        document.getElementById('guestPanel').style.display = 'none';
+        document.getElementById('guestAnswerSection').style.display = 'none';
         this.setStatus('disconnected', 'none');
-        this.addSystemLog('通信が切断されました。');
+        this.addSystemLog('接続をリセットしました。');
       }
 
-      handleBtError(msg) {
-        this.setStatus('error', 'none');
-        this.addSystemLog(`❌ ${msg}`);
+      copyCode(elementId) {
+        const textarea = document.getElementById(elementId);
+        textarea.select();
+        document.execCommand('copy');
+        alert('コードをクリップボードにコピーしました！');
       }
 
       // --- UI Helper Methods ---
@@ -680,28 +784,25 @@
         const badge = document.getElementById('statusBadge');
         const roleDisp = document.getElementById('roleDisplay');
         const disconnectBtn = document.getElementById('disconnectBtn');
-        const hostBtn = document.getElementById('hostBtn');
-        const guestBtn = document.getElementById('guestBtn');
+        const hostBtn = document.getElementById('hostModeBtn');
+        const guestBtn = document.getElementById('guestModeBtn');
 
-        // Status Badge Class
         badge.className = `status-badge ${this.state.status}`;
         if (this.state.status === 'connected') {
-          badge.innerText = '● 接続中 (Connected)';
+          badge.innerText = '● P2P接続中 (Connected)';
         } else if (this.state.status === 'connecting') {
-          badge.innerText = '⏳ 接続試行中...';
+          badge.innerText = '⏳ 接続手続中...';
         } else if (this.state.status === 'error') {
           badge.innerText = '⚠️ エラー';
         } else {
           badge.innerText = '未接続';
         }
 
-        // Role Display
         const roleLabel = this.state.role === 'host' ? '親機 (Host)' : this.state.role === 'guest' ? '子機 (Guest)' : '未選択';
         roleDisp.innerText = `役割: ${roleLabel}`;
 
-        // Buttons
         const isConnected = this.state.status === 'connected' || this.state.simulationMode;
-        disconnectBtn.disabled = !isConnected;
+        disconnectBtn.disabled = !isConnected && this.state.status === 'disconnected';
         hostBtn.disabled = isConnected;
         guestBtn.disabled = isConnected;
       }
@@ -745,7 +846,7 @@
       }
     }
 
-    const app = new P2PChatApp();
+    const app = new WebRTCP2PChat();
   </script>
 </body>
 
