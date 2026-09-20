@@ -101,14 +101,14 @@ class WebRTCP2PChat {
       } else if (line.startsWith('a=candidate:')) {
         const parts = line.substring(12).split(' ');
         if (parts.length >= 8) {
-          // IP, Port, Type
-          candList.push(`${parts[4]}:${parts[5]}:${parts[7]}`);
+          // IP, Port, Type (セミコロン区切りでIPv6アドレスのコロンと衝突しないようにする)
+          candList.push(`${parts[4]};${parts[5]};${parts[7]}`);
         }
       }
     }
 
     const typeFlag = sdpInit.type === 'offer' ? 'O' : 'A';
-    // Format: O,ufrag,pwd,fp,ip1:port1:typ1|ip2:port2:typ2
+    // Format: O,ufrag,pwd,fp,ip1;port1;typ1|ip2;port2;typ2
     return `${typeFlag},${ufrag},${pwd},${fp},${candList.join('|')}`;
   }
 
@@ -154,9 +154,14 @@ class WebRTCP2PChat {
       if (candStr) {
         const cands = candStr.split('|');
         cands.forEach((c, idx) => {
-          const [ip, port, ctype] = c.split(':');
-          if (ip && port) {
-            sdp += `a=candidate:${idx + 1} 1 UDP ${2122260223 - idx} ${ip} ${port} typ ${ctype || 'host'}\r\n`;
+          let f = c.split(';');
+          if (f.length < 2) f = c.split(':'); // 旧形式の相互互換
+          const ip = f[0];
+          const port = f[1];
+          const ctype = f[2];
+          // 不正ポート（非数値・IPv6誤分割）の候補はスキップしてSDPを壊さない
+          if (ip && /^\d+$/.test(port)) {
+            sdp += `a=candidate:${idx + 1} 1 udp ${2122260223 - idx} ${ip} ${port} typ ${ctype || 'host'}\r\n`;
           }
         });
       }
