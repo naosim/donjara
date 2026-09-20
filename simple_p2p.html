@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>最小構成 WebRTC DataChannel P2P サンプル</title>
+</head>
+<body>
+
+  <h1>最小構成 WebRTC P2P チャット</h1>
+
+  <!-- 1. 役割選択と接続準備 -->
+  <h2>1. 接続の準備</h2>
+  <button onclick="initHost()">親機（Host）として招待コードを発行</button>
+  <button onclick="initGuest()">子機（Guest）として接続準備</button>
+
+  <hr>
+
+  <!-- 2. 親機用エリア -->
+  <div id="hostSection" style="display:none;">
+    <h3>【親機の手順 1】以下の「招待コード」をコピーして子機に送る</h3>
+    <textarea id="offerCode" rows="4" cols="60" readonly></textarea>
+    
+    <h3>【親機の手順 2】子機から送られてきた「応答コード」を貼り付けて接続</h3>
+    <textarea id="hostAnswerInput" rows="4" cols="60" placeholder="応答コードを貼り付け"></textarea><br>
+    <button onclick="acceptAnswer()">接続を確定する</button>
+  </div>
+
+  <!-- 3. 子機用エリア -->
+  <div id="guestSection" style="display:none;">
+    <h3>【子機の手順 1】親機の「招待コード」を貼り付けて応答コードを発行</h3>
+    <textarea id="guestOfferInput" rows="4" cols="60" placeholder="招待コードを貼り付け"></textarea><br>
+    <button onclick="createAnswer()">応答コードを発行する</button>
+
+    <h3>【子機の手順 2】以下の「応答コード」をコピーして親機に送る</h3>
+    <textarea id="answerCode" rows="4" cols="60" readonly></textarea>
+  </div>
+
+  <hr>
+
+  <!-- 4. P2P チャットエリア -->
+  <h2>2. チャット送信</h2>
+  <div>ステータス: <b id="status">未接続</b></div>
+  <br>
+  <input type="text" id="messageInput" placeholder="メッセージを入力">
+  <button onclick="sendMessage()">送信</button>
+
+  <h3>チャットログ</h3>
+  <div id="chatLog" style="border: 1px solid #ccc; padding: 10px; min-height: 100px;"></div>
+
+  <script>
+    // STUNサーバー設定（Googleの無料STUNサーバーを使用し、NAT越え・インターネット通信に対応）
+    const rtcConfig = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' }
+      ]
+    };
+
+    let pc = null;
+    let dataChannel = null;
+
+    // --- DataChannelのイベント設定 ---
+    function setupDataChannel(channel) {
+      dataChannel = channel;
+      
+      dataChannel.onopen = () => {
+        document.getElementById('status').innerText = 'P2P接続成功 (OPEN)';
+        log('🎉 P2P通信が開通しました！');
+      };
+
+      dataChannel.onmessage = (event) => {
+        log('相手: ' + event.data);
+      };
+    }
+
+    // --- 親機 (Host) の処理 ---
+    async function initHost() {
+      document.getElementById('hostSection').style.display = 'block';
+      document.getElementById('guestSection').style.display = 'none';
+
+      pc = new RTCPeerConnection(rtcConfig);
+      
+      // 親機側でDataChannelを作成
+      const dc = pc.createDataChannel('chatChannel');
+      setupDataChannel(dc);
+
+      // Offer (招待SDP) の作成
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      // ICE候補の収集完了を待ってコード化（テキスト化）
+      await waitForIceGathering(pc);
+      document.getElementById('offerCode').value = btoa(JSON.stringify(pc.localDescription));
+    }
+
+    async function acceptAnswer() {
+      const answerCode = document.getElementById('hostAnswerInput').value.trim();
+      const answerSdp = JSON.parse(atob(answerCode));
+      await pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
+    }
+
+    // --- 子機 (Guest) の処理 ---
+    function initGuest() {
+      document.getElementById('guestSection').style.display = 'block';
+      document.getElementById('hostSection').style.display = 'none';
+    }
+
+    async function createAnswer() {
+      const offerCode = document.getElementById('guestOfferInput').value.trim();
+      const offerSdp = JSON.parse(atob(offerCode));
+
+      pc = new RTCPeerConnection(rtcConfig);
+
+      // 親機からのDataChannel受信イベントを監視
+      pc.ondatachannel = (event) => {
+        setupDataChannel(event.channel);
+      };
+
+      await pc.setRemoteDescription(new RTCSessionDescription(offerSdp));
+
+      // Answer (応答SDP) の作成
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      // ICE候補の収集完了を待ってコード化
+      await waitForIceGathering(pc);
+      document.getElementById('answerCode').value = btoa(JSON.stringify(pc.localDescription));
+    }
+
+    // --- メッセージ送信 ---
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const text = input.value;
+      if (!text || !dataChannel || dataChannel.readyState !== 'open') return;
+
+      dataChannel.send(text);
+      log('自分: ' + text);
+      input.value = '';
+    }
+
+    // --- ICE収集完了待ちユーティリティ ---
+    function waitForIceGathering(pc) {
+      return new Promise((resolve) => {
+        if (pc.iceGatheringState === 'complete') {
+          resolve();
+        } else {
+          const checkState = () => {
+            if (pc.iceGatheringState === 'complete') {
+              pc.removeEventListener('icegatheringstatechange', checkState);
+              resolve();
+            }
+          };
+          pc.addEventListener('icegatheringstatechange', checkState);
+          setTimeout(resolve, 1000); // 1秒タイムアウト fallback
+        }
+      });
+    }
+
+    function log(msg) {
+      const logDiv = document.getElementById('chatLog');
+      logDiv.innerHTML += msg + '<br>';
+    }
+  </script>
+</body>
+</html>
