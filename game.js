@@ -139,15 +139,95 @@ function analyzeWin(cards) {
   return null;
 }
 
-/** 役（加算式）を判定して点数を返す */
+class Yaku {
+  constructor(definition) {
+    this.id = definition.id;
+    this.name = definition.name;
+    this.points = definition.points;
+    this.type = definition.type;
+  }
+
+  isSatisfied() {
+    return false;
+  }
+
+  isRiichi(cards) {
+    return isTenpai(cards);
+  }
+
+  result() {
+    return { id: this.id, name: this.name, pts: this.points, type: this.type };
+  }
+}
+
+class BasicYaku extends Yaku {
+  isSatisfied(cards, context) {
+    return Array.isArray(cards) && cards.length === 9 &&
+      Array.isArray(context.groups) && context.groups.length === 3;
+  }
+}
+
+class AllSameMotifYaku extends Yaku {
+  isSatisfied(cards, context) {
+    return new Set(context.groups.map((group) => group.motif)).size === 1;
+  }
+}
+
+class AllDifferentMotifYaku extends Yaku {
+  isSatisfied(cards, context) {
+    return new Set(context.groups.map((group) => group.motif)).size === 3;
+  }
+}
+
+class NoWildYaku extends Yaku {
+  isSatisfied(cards) {
+    return cards.every((card) => !card.wild);
+  }
+}
+
+const YAKU_CLASSES = {
+  BasicYaku,
+  AllSameMotifYaku,
+  AllDifferentMotifYaku,
+  NoWildYaku
+};
+
+class YakuManager {
+  constructor(yakus = []) {
+    this.yakus = yakus;
+  }
+
+  evaluate(cards, context = {}) {
+    const satisfied = this.yakus.filter((yaku) => yaku.isSatisfied(cards, context));
+    const agariYakus = satisfied
+      .filter((yaku) => yaku.type === 'agari')
+      .sort((a, b) => b.points - a.points);
+    if (agariYakus.length === 0) return { yaku: [], total: 0, canWin: false };
+
+    const selected = [agariYakus[0], ...satisfied.filter((yaku) => yaku.type === 'addition')];
+    return {
+      yaku: selected.map((yaku) => yaku.result()),
+      total: selected.reduce((sum, yaku) => sum + yaku.points, 0),
+      canWin: true
+    };
+  }
+}
+
+function createConfiguredYakus(definitions) {
+  return definitions.map((definition) => {
+    const YakuClass = YAKU_CLASSES[definition.className];
+    if (!YakuClass) throw new Error(`未登録の役クラスです: ${definition.className}`);
+    return new YakuClass(definition);
+  });
+}
+
+const DEFAULT_YAKU_MANAGER = new YakuManager(createConfiguredYakus(window.DONJARA_YAKUS));
+
+/** 既存呼び出し互換の役評価API */
 function scoreYaku(groups, jokersUsed) {
-  const yaku = [{ name: '基本', pts: 10 }];
-  const distinctMotifs = new Set(groups.map((g) => g.motif)).size;
-  if (distinctMotifs === 1) yaku.push({ name: '全組同柄', pts: 20 });
-  if (distinctMotifs === 3) yaku.push({ name: '全組異柄', pts: 10 });
-  if (jokersUsed === 0) yaku.push({ name: 'ジョーカー不使用', pts: 5 });
-  const total = yaku.reduce((s, y) => s + y.pts, 0);
-  return { yaku, total };
+  const cards = groups.reduce((all, group) => all.concat(group.cards || []), []);
+  const result = DEFAULT_YAKU_MANAGER.evaluate(cards, { groups, jokersUsed });
+  return { yaku: result.yaku, total: result.total };
 }
 
 /**
@@ -1105,6 +1185,12 @@ if (typeof module !== 'undefined' && module.exports) {
     analyzeWin9,
     isTenpai,
     scoreYaku,
+    Yaku,
+    BasicYaku,
+    AllSameMotifYaku,
+    AllDifferentMotifYaku,
+    NoWildYaku,
+    YakuManager,
     DonjaraAI,
     DonjaraGame
   };
