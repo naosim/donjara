@@ -465,6 +465,7 @@
   <header>
     <h1>ドンジャラ WebRTC P2P <span style="font-size:0.75rem; font-weight:normal;">(Step 1 - QR対応)</span></h1>
     <div class="header-btns">
+      <button class="btn-secondary" onclick="app.showShareQR()">🔗 URLをQRで共有</button>
       <button class="btn-secondary" onclick="app.toggleTheme()">🌓 E-Ink切替</button>
     </div>
   </header>
@@ -554,6 +555,25 @@
       <div id="scanStatus" style="font-size:0.85rem; font-weight:700; color:var(--primary); margin-bottom: 10px;">スキャン準備中...</div>
 
       <button class="btn-secondary" style="width: 100%;" onclick="app.closeScanner()">キャンセル / 閉じる</button>
+    </div>
+  </div>
+
+  <!-- Share URL Modal -->
+  <div class="modal-overlay" id="shareModal">
+    <div class="modal-card">
+      <h3 style="font-size:1.1rem; margin-bottom: 6px;">🔗 このサイトを友達に共有</h3>
+      <p style="font-size:0.8rem; color: var(--text-muted);">以下のQRコードを読み取るか、URLを送ってアクセスしてもらってください。</p>
+
+      <div class="qr-container">
+        <canvas id="shareQRCanvas" class="qr-canvas"></canvas>
+      </div>
+
+      <div class="form-group code-display" style="margin-bottom: 10px;">
+        <textarea id="shareUrlInput" class="form-control" readonly placeholder="URLを取得中..."></textarea>
+        <button class="btn-secondary copy-btn" onclick="app.copyCode('shareUrlInput')">📋 コピー</button>
+      </div>
+
+      <button class="btn-secondary" style="width: 100%;" onclick="app.closeShareModal()">閉じる</button>
     </div>
   </div>
 

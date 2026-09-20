@@ -337,6 +337,21 @@ class WebRTCP2PChat {
     if (modal) modal.classList.remove('active');
   }
 
+  // --- Share URL QR ---
+  showShareQR() {
+    const url = window.location.href;
+    const input = document.getElementById('shareUrlInput');
+    if (input) input.value = url;
+    this.safeRenderQR('shareQRCanvas', url, '【共有QR】');
+    const modal = document.getElementById('shareModal');
+    if (modal) modal.classList.add('active');
+  }
+
+  closeShareModal() {
+    const modal = document.getElementById('shareModal');
+    if (modal) modal.classList.remove('active');
+  }
+
   // --- DataChannel Events ---
   setupDataChannelEvents(channel) {
     channel.onopen = () => {
