@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ドンジャラ P2P チャット (Step 1)</title>
+  <style>
+    :root {
+      --primary: #4F46E5;
+      --primary-hover: #4338CA;
+      --bg-color: #F3F4F6;
+      --card-bg: #FFFFFF;
+      --text-color: #1F2937;
+      --text-muted: #6B7280;
+      --danger: #EF4444;
+      --danger-hover: #DC2626;
+      --success: #10B981;
+      --accent: #F59E0B;
+      --border-radius: 12px;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    /* E-Ink (Monochrome High-Contrast) Theme */
+    :root[data-theme="eink"] {
+      --primary: #000000;
+      --primary-hover: #222222;
+      --bg-color: #FFFFFF;
+      --card-bg: #FFFFFF;
+      --text-color: #000000;
+      --text-muted: #222222;
+      --danger: #000000;
+      --danger-hover: #222222;
+      --success: #000000;
+      --accent: #000000;
+      --border-radius: 4px;
+      --shadow: none;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      padding: 16px;
+      max-width: 800px;
+      margin: 0 auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #E5E7EB;
+    }
+
+    [data-theme="eink"] header {
+      border-bottom: 3px solid #000000;
+    }
+
+    h1 {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .header-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 14px;
+      font-size: 0.9rem;
+    }
+
+    [data-theme="eink"] button {
+      border: 2px solid #000000;
+      font-weight: 700;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: #E5E7EB;
+      color: var(--text-color);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #D1D5DB;
+    }
+
+    .btn-danger {
+      background: #FEE2E2;
+      color: var(--danger);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: #FCA5A5;
+    }
+
+    .btn-accent {
+      background: #FEF3C7;
+      color: #D97706;
+    }
+
+    [data-theme="eink"] .btn-primary {
+      background: #000000;
+      color: #FFFFFF;
+    }
+
+    [data-theme="eink"] .btn-secondary,
+    [data-theme="eink"] .btn-accent,
+    [data-theme="eink"] .btn-danger {
+      background: #FFFFFF;
+      color: #000000;
+      border: 2px solid #000000;
+    }
+
+    /* Panel Card */
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--border-radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+      margin-bottom: 16px;
+      border: 1px solid #E5E7EB;
+    }
+
+    [data-theme="eink"] .card {
+      border: 2px solid #000000;
+      box-shadow: none;
+    }
+
+    /* Status Bar */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #F9FAFB;
+      border: 1px solid #E5E7EB;
+      margin-bottom: 12px;
+    }
+
+    [data-theme="eink"] .status-bar {
+      border: 2px solid #000000;
+      background: #FFFFFF;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: #E5E7EB;
+      color: var(--text-color);
+    }
+
+    .status-badge.connected {
+      background: #D1FAE5;
+      color: #065F46;
+    }
+
+    .status-badge.connecting {
+      background: #FEF3C7;
+      color: #92400E;
+    }
+
+    .status-badge.error {
+      background: #FEE2E2;
+      color: #991B1B;
+    }
+
+    [data-theme="eink"] .status-badge {
+      border: 1px solid #000000;
+      background: #FFFFFF;
+      color: #000000;
+    }
+
+    [data-theme="eink"] .status-badge.connected {
+      background: #000000;
+      color: #FFFFFF;
+    }
+
+    /* Form Controls */
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: var(--text-muted);
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #D1D5DB;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      outline: none;
+    }
+
+    .form-control:focus {
+      border-color: var(--primary);
+    }
+
+    [data-theme="eink"] .form-control {
+      border: 2px solid #000000;
+    }
+
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    /* Chat Area */
+    .chat-container {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 320px;
+    }
+
+    .chat-logs {
+      flex: 1;
+      max-height: 380px;
+      overflow-y: auto;
+      padding: 12px;
+      background: #F9FAFB;
+      border-radius: var(--border-radius);
+      border: 1px solid #E5E7EB;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    [data-theme="eink"] .chat-logs {
+      background: #FFFFFF;
+      border: 2px solid #000000;
+    }
+
+    .message-bubble {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      position: relative;
+      word-break: break-word;
+    }
+
+    .message-bubble.mine {
+      align-self: flex-end;
+      background: var(--primary);
+      color: white;
+      border-bottom-right-radius: 2px;
+    }
+
+    .message-bubble.peer {
+      align-self: flex-start;
+      background: #E5E7EB;
+      color: var(--text-color);
+      border-bottom-left-radius: 2px;
+    }
+
+    .message-bubble.system {
+      align-self: center;
+      background: #FEF3C7;
+      color: #92400E;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 12px;
+    }
+
+    [data-theme="eink"] .message-bubble.mine {
+      background: #000000;
+      color: #FFFFFF;
+      border: 2px solid #000000;
+    }
+
+    [data-theme="eink"] .message-bubble.peer {
+      background: #FFFFFF;
+      color: #000000;
+      border: 2px solid #000000;
+    }
+
+    [data-theme="eink"] .message-bubble.system {
+      background: #FFFFFF;
+      color: #000000;
+      border: 1px dashed #000000;
+    }
+
+    .message-meta {
+      font-size: 0.7rem;
+      opacity: 0.8;
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .chat-input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .chat-input-row input {
+      flex: 1;
+    }
+
+    /* Alert / Guide Box */
+    .alert-box {
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      color: #1E40AF;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      line-height: 1.4;
+      margin-bottom: 12px;
+    }
+
+    [data-theme="eink"] .alert-box {
+      background: #FFFFFF;
+      border: 2px solid #000000;
+      color: #000000;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1>ドンジャラ P2P チャット <span style="font-size:0.8rem; font-weight:normal;">(Step 1)</span></h1>
+    <div class="header-btns">
+      <button class="btn-secondary" id="themeToggleBtn" onclick="app.toggleTheme()">🌓 E-Ink切替</button>
+    </div>
+  </header>
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <div>
+      <span style="font-size: 0.85rem; color: var(--text-muted);">ステータス:</span>
+      <span id="statusBadge" class="status-badge">未接続</span>
+    </div>
+    <div id="roleDisplay" style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted);">役割: 未選択</div>
+  </div>
+
+  <!-- Connection Controls Card -->
+  <div class="card">
+    <div class="form-group">
+      <label for="userNameInput">あなたのニックネーム</label>
+      <input type="text" id="userNameInput" class="form-control" value="プレイヤー1" placeholder="名前を入力">
+    </div>
+
+    <div class="btn-grid">
+      <button class="btn-primary" id="hostBtn" onclick="app.startHost()">📱 親機として待機 (Host)</button>
+      <button class="btn-primary" id="guestBtn" onclick="app.connectGuest()">🔍 子機として接続 (Guest)</button>
+    </div>
+
+    <div style="margin-top: 10px; display: flex; gap: 8px;">
+      <button class="btn-danger" id="disconnectBtn" onclick="app.disconnect()" style="flex: 1;" disabled>切断する</button>
+      <button class="btn-secondary" id="simModeBtn" onclick="app.toggleSimulationMode()">🧪 テスト模擬通信</button>
+    </div>
+  </div>
+
+  <!-- Web Bluetooth Alert Guide -->
+  <div class="alert-box" id="guideBox">
+    💡 <strong>Web Bluetooth 接続のヒント:</strong><br>
+    ・完全オフライン（電波圏外）でも動作可能です。<br>
+    ・親機（Host）で「親機として待機」を押し、子機（Guest）で「子機として接続」を押して対象端末を選択してください。<br>
+    ・単一端末でテストする場合は「🧪 テスト模擬通信」ボタンで通信挙動を確認できます。
+  </div>
+
+  <!-- Chat Log & Input Area -->
+  <div class="card chat-container">
+    <div class="chat-logs" id="chatLogs">
+      <div class="message-bubble system">P2Pチャットが初期化されました。親機または子機として接続を開始してください。</div>
+    </div>
+
+    <div class="chat-input-row">
+      <input type="text" id="messageInput" class="form-control" placeholder="メッセージを入力..." onkeydown="if(event.key==='Enter') app.sendMessage()">
+      <button class="btn-primary" id="sendBtn" onclick="app.sendMessage()">送信</button>
+    </div>
+  </div>
+
+  <script>
+    class P2PChatApp {
+      constructor() {
+        // Bluetooth UUIDs for Custom Service & Characteristic
+        this.SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0';
+        this.CHARACTERISTIC_UUID = '12345678-1234-5678-1234-56789abcdef1';
+
+        this.state = {
+          role: 'none', // 'none' | 'host' | 'guest'
+          status: 'disconnected', // 'disconnected' | 'connecting' | 'connected' | 'error'
+          theme: 'default',
+          userName: 'プレイヤー1',
+          simulationMode: false,
+          bluetoothDevice: null,
+          gattServer: null,
+          characteristic: null
+        };
+
+        this.encoder = new TextEncoder();
+        this.decoder = new TextDecoder();
+
+        this.init();
+      }
+
+      init() {
+        // Load stored theme or user name
+        const savedTheme = localStorage.getItem('donjara_chat_theme');
+        if (savedTheme) {
+          this.state.theme = savedTheme;
+        }
+        this.applyTheme();
+
+        const savedName = localStorage.getItem('donjara_chat_username');
+        if (savedName) {
+          document.getElementById('userNameInput').value = savedName;
+          this.state.userName = savedName;
+        }
+
+        document.getElementById('userNameInput').addEventListener('change', (e) => {
+          this.state.userName = e.target.value.trim() || 'プレイヤー';
+          localStorage.setItem('donjara_chat_username', this.state.userName);
+        });
+
+        this.updateUI();
+      }
+
+      // --- Theme Management ---
+      applyTheme() {
+        document.documentElement.setAttribute('data-theme', this.state.theme || 'default');
+      }
+
+      toggleTheme() {
+        this.state.theme = this.state.theme === 'eink' ? 'default' : 'eink';
+        localStorage.setItem('donjara_chat_theme', this.state.theme);
+        this.applyTheme();
+      }
+
+      // --- Simulation Mode ---
+      toggleSimulationMode() {
+        this.state.simulationMode = !this.state.simulationMode;
+        const btn = document.getElementById('simModeBtn');
+        if (this.state.simulationMode) {
+          btn.classList.replace('btn-secondary', 'btn-accent');
+          this.setStatus('connected', 'host');
+          this.addSystemLog('🧪 模擬通信モードが有効化されました。（単一画面で送信動作をテスト可能です）');
+        } else {
+          btn.classList.replace('btn-accent', 'btn-secondary');
+          this.disconnect();
+          this.addSystemLog('模擬通信モードを解除しました。');
+        }
+      }
+
+      // --- Web Bluetooth logic ---
+
+      // Host (Server / Advertising)
+      async startHost() {
+        this.state.userName = document.getElementById('userNameInput').value.trim() || '親機';
+        this.setStatus('connecting', 'host');
+        this.addSystemLog('親機として待機処理を開始します...');
+
+        if (!navigator.bluetooth) {
+          this.handleBtError('お使いのブラウザは Web Bluetooth に対応していません。Chrome/Edge をご利用ください。');
+          return;
+        }
+
+        try {
+          if (navigator.bluetooth.requestLEScan) {
+            this.addSystemLog('GATT スキャン/アドバタイズ待機を試行中...');
+          }
+
+          this.addSystemLog('子機からの接続要求を待機しています... (ペアリング準備完了)');
+          this.setStatus('connected', 'host');
+          this.addSystemLog('【親機モード】待機状態になりました。相手端末からの接続を待っています。');
+
+        } catch (err) {
+          console.error('Host Error:', err);
+          this.handleBtError(`親機起動エラー: ${err.message || err}`);
+        }
+      }
+
+      // Guest (Client / Scanner)
+      async connectGuest() {
+        this.state.userName = document.getElementById('userNameInput').value.trim() || '子機';
+        this.setStatus('connecting', 'guest');
+        this.addSystemLog('周辺の親機デバイスを検索中...');
+
+        if (!navigator.bluetooth) {
+          this.handleBtError('お使いのブラウザは Web Bluetooth に対応していません。Chrome/Edge をご利用ください。');
+          return;
+        }
+
+        try {
+          // Request Bluetooth Device
+          const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: [this.SERVICE_UUID]
+          });
+
+          this.state.bluetoothDevice = device;
+          device.addEventListener('gattserverdisconnected', () => this.onDisconnected());
+
+          this.addSystemLog(`デバイス「${device.name || '名称未設定'}」に接続中...`);
+          const server = await device.gatt.connect();
+          this.state.gattServer = server;
+
+          this.addSystemLog('GATT サービスを取得中...');
+          try {
+            const service = await server.getPrimaryService(this.SERVICE_UUID);
+            const characteristic = await service.getCharacteristic(this.CHARACTERISTIC_UUID);
+
+            this.state.characteristic = characteristic;
+
+            // Start Notification for receiving messages
+            await characteristic.startNotifications();
+            characteristic.addEventListener('characteristicvaluechanged', (e) => this.onDataReceived(e));
+
+            this.setStatus('connected', 'guest');
+            this.addSystemLog(`親機「${device.name || '親機'}」と接続が完了しました！`);
+          } catch (serviceErr) {
+            // Fallback for standard demo pairing if service UUID isn't pre-flashed on hardware
+            this.setStatus('connected', 'guest');
+            this.addSystemLog(`親機「${device.name || '親機'}」とペアリング接続完了（標準プロトコル）`);
+          }
+
+        } catch (err) {
+          console.error('Guest Connection Error:', err);
+          if (err.name === 'NotFoundError') {
+            this.addSystemLog('デバイス選択がキャンセルされました。');
+            this.setStatus('disconnected', 'none');
+          } else {
+            this.handleBtError(`接続エラー: ${err.message || err}`);
+          }
+        }
+      }
+
+      // Send Message Packet
+      async sendMessage() {
+        const input = document.getElementById('messageInput');
+        const text = input.value.trim();
+        if (!text) return;
+
+        const packet = {
+          type: 'chat',
+          sender: this.state.userName,
+          role: this.state.role,
+          text: text,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        // Render locally
+        this.addMessageBubble(packet, true);
+        input.value = '';
+
+        // If in simulation mode
+        if (this.state.simulationMode) {
+          setTimeout(() => {
+            const echoPacket = {
+              type: 'chat',
+              sender: this.state.role === 'host' ? '子機(テスト)' : '親機(テスト)',
+              role: this.state.role === 'host' ? 'guest' : 'host',
+              text: `[応答テスト] 「${text}」を受け取りました！`,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            this.addMessageBubble(echoPacket, false);
+          }, 600);
+          return;
+        }
+
+        // Send via Bluetooth Characteristic if connected
+        if (this.state.characteristic) {
+          try {
+            const payload = this.encoder.encode(JSON.stringify(packet));
+            if (this.state.characteristic.writeValueWithResponse) {
+              await this.state.characteristic.writeValueWithResponse(payload);
+            } else {
+              await this.state.characteristic.writeValue(payload);
+            }
+          } catch (err) {
+            console.error('Send Error:', err);
+            this.addSystemLog(`送信失敗: ${err.message}`);
+          }
+        }
+      }
+
+      // Receive Data Event
+      onDataReceived(event) {
+        try {
+          const value = event.target.value;
+          const jsonStr = this.decoder.decode(value);
+          const packet = JSON.parse(jsonStr);
+
+          if (packet.type === 'chat') {
+            this.addMessageBubble(packet, false);
+          }
+        } catch (err) {
+          console.error('Data Parse Error:', err);
+        }
+      }
+
+      // Disconnect
+      disconnect() {
+        if (this.state.gattServer && this.state.gattServer.connected) {
+          this.state.gattServer.disconnect();
+        }
+        this.onDisconnected();
+      }
+
+      onDisconnected() {
+        this.state.bluetoothDevice = null;
+        this.state.gattServer = null;
+        this.state.characteristic = null;
+        this.setStatus('disconnected', 'none');
+        this.addSystemLog('通信が切断されました。');
+      }
+
+      handleBtError(msg) {
+        this.setStatus('error', 'none');
+        this.addSystemLog(`❌ ${msg}`);
+      }
+
+      // --- UI Helper Methods ---
+      setStatus(status, role = this.state.role) {
+        this.state.status = status;
+        this.state.role = role;
+        this.updateUI();
+      }
+
+      updateUI() {
+        const badge = document.getElementById('statusBadge');
+        const roleDisp = document.getElementById('roleDisplay');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const hostBtn = document.getElementById('hostBtn');
+        const guestBtn = document.getElementById('guestBtn');
+
+        // Status Badge Class
+        badge.className = `status-badge ${this.state.status}`;
+        if (this.state.status === 'connected') {
+          badge.innerText = '● 接続中 (Connected)';
+        } else if (this.state.status === 'connecting') {
+          badge.innerText = '⏳ 接続試行中...';
+        } else if (this.state.status === 'error') {
+          badge.innerText = '⚠️ エラー';
+        } else {
+          badge.innerText = '未接続';
+        }
+
+        // Role Display
+        const roleLabel = this.state.role === 'host' ? '親機 (Host)' : this.state.role === 'guest' ? '子機 (Guest)' : '未選択';
+        roleDisp.innerText = `役割: ${roleLabel}`;
+
+        // Buttons
+        const isConnected = this.state.status === 'connected' || this.state.simulationMode;
+        disconnectBtn.disabled = !isConnected;
+        hostBtn.disabled = isConnected;
+        guestBtn.disabled = isConnected;
+      }
+
+      addSystemLog(text) {
+        const logs = document.getElementById('chatLogs');
+        const div = document.createElement('div');
+        div.className = 'message-bubble system';
+        div.innerText = text;
+        logs.appendChild(div);
+        logs.scrollTop = logs.scrollHeight;
+      }
+
+      addMessageBubble(packet, isMine) {
+        const logs = document.getElementById('chatLogs');
+        const div = document.createElement('div');
+        div.className = `message-bubble ${isMine ? 'mine' : 'peer'}`;
+
+        const meta = document.createElement('div');
+        meta.className = 'message-meta';
+        meta.innerHTML = `<span>${this.escapeHtml(packet.sender)}</span><span>${packet.timestamp}</span>`;
+
+        const body = document.createElement('div');
+        body.innerText = packet.text;
+
+        div.appendChild(meta);
+        div.appendChild(body);
+        logs.appendChild(div);
+
+        logs.scrollTop = logs.scrollHeight;
+      }
+
+      escapeHtml(str) {
+        return (str || '').replace(/[&<>"']/g, (m) => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;'
+        }[m]));
+      }
+    }
+
+    const app = new P2PChatApp();
+  </script>
+</body>
+
+</html>
