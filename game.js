@@ -24,6 +24,7 @@ function buildDeck() {
           id: ++CARD_SEQ,
           motif: m.id,
           variant: variant.number,
+          sortOrder: m.sortOrder,
           variantLabel: variant.label || '',
           emoji: m.emoji,
           label: variant.label || '',
@@ -52,6 +53,30 @@ function shuffle(arr, rand) {
 function motifMeta(motifId) {
   if (motifId === WILD.id) return WILD;
   return DONJARA_MOTIFS.find((m) => m.id === motifId);
+}
+
+function cardSortKey(card) {
+  if (card.wild) return [0, 0, 0, card.id || 0];
+  const motif = DONJARA_MOTIFS.find((m) => m.id === card.motif);
+  return [motif ? motif.sortOrder : 999, card.variant || 999, card.id || 0];
+}
+
+function compareCards(a, b) {
+  const ak = cardSortKey(a);
+  const bk = cardSortKey(b);
+  for (let i = 0; i < ak.length; i++) {
+    if (ak[i] !== bk[i]) return ak[i] - bk[i];
+  }
+  return 0;
+}
+
+function sortCards(cards) {
+  return cards.slice().sort(compareCards);
+}
+
+function sortGroups(groups) {
+  return groups.map((group) => ({ ...group, cards: sortCards(group.cards || []) }))
+    .sort((a, b) => compareCards(a.cards[0] || { id: 0 }, b.cards[0] || { id: 0 }));
 }
 
 function countMotifs(cards) {
@@ -139,94 +164,17 @@ function analyzeWin(cards) {
   return null;
 }
 
-class Yaku {
-  constructor(definition) {
-    this.id = definition.id;
-    this.name = definition.name;
-    this.points = definition.points;
-    this.type = definition.type;
-  }
-
-  isSatisfied() {
-    return false;
-  }
-
-  isRiichi(cards) {
-    return isTenpai(cards);
-  }
-
-  result() {
-    return { id: this.id, name: this.name, pts: this.points, type: this.type };
-  }
+function createConfiguredYakus(yakuClasses) {
+  return yakuClasses.map((YakuClass) => new YakuClass());
 }
 
-class BasicYaku extends Yaku {
-  isSatisfied(cards, context) {
-    return Array.isArray(cards) && cards.length === 9 &&
-      Array.isArray(context.groups) && context.groups.length === 3;
-  }
-}
-
-class AllSameMotifYaku extends Yaku {
-  isSatisfied(cards, context) {
-    return new Set(context.groups.map((group) => group.motif)).size === 1;
-  }
-}
-
-class AllDifferentMotifYaku extends Yaku {
-  isSatisfied(cards, context) {
-    return new Set(context.groups.map((group) => group.motif)).size === 3;
-  }
-}
-
-class NoWildYaku extends Yaku {
-  isSatisfied(cards) {
-    return cards.every((card) => !card.wild);
-  }
-}
-
-const YAKU_CLASSES = {
-  BasicYaku,
-  AllSameMotifYaku,
-  AllDifferentMotifYaku,
-  NoWildYaku
-};
-
-class YakuManager {
-  constructor(yakus = []) {
-    this.yakus = yakus;
-  }
-
-  evaluate(cards, context = {}) {
-    const satisfied = this.yakus.filter((yaku) => yaku.isSatisfied(cards, context));
-    const agariYakus = satisfied
-      .filter((yaku) => yaku.type === 'agari')
-      .sort((a, b) => b.points - a.points);
-    if (agariYakus.length === 0) return { yaku: [], total: 0, canWin: false };
-
-    const selected = [agariYakus[0], ...satisfied.filter((yaku) => yaku.type === 'addition')];
-    return {
-      yaku: selected.map((yaku) => yaku.result()),
-      total: selected.reduce((sum, yaku) => sum + yaku.points, 0),
-      canWin: true
-    };
-  }
-}
-
-function createConfiguredYakus(definitions) {
-  return definitions.map((definition) => {
-    const YakuClass = YAKU_CLASSES[definition.className];
-    if (!YakuClass) throw new Error(`未登録の役クラスです: ${definition.className}`);
-    return new YakuClass(definition);
-  });
-}
-
-const DEFAULT_YAKU_MANAGER = new YakuManager(createConfiguredYakus(window.DONJARA_YAKUS));
+const DEFAULT_YAKU_MANAGER = new window.YakuManager(createConfiguredYakus(window.DONJARA_YAKUS));
 
 /** 既存呼び出し互換の役評価API */
-function scoreYaku(groups, jokersUsed) {
-  const cards = groups.reduce((all, group) => all.concat(group.cards || []), []);
-  const result = DEFAULT_YAKU_MANAGER.evaluate(cards, { groups, jokersUsed });
+function scoreYaku(groups, jokersUsed, extraContext = {}) {
+  const sortedGroups = sortGroups(groups);
+  const cards = sortCards(sortedGroups.reduce((all, group) => all.concat(group.cards || []), []));
+  const result = DEFAULT_YAKU_MANAGER.evaluate(cards, { groups: sortedGroups, jokersUsed, ...extraContext });
   return { yaku: result.yaku, total: result.total };
 }
 
@@ -308,6 +256,7 @@ class DonjaraGame {
       wonFlags: [false, false],
       riichi: [false, false],
       riichiAsked: [false, false],
+      ippatsuPending: [false, false],
       msg: '',
       roundResult: null,
       gameOver: null
@@ -392,19 +341,18 @@ class DonjaraGame {
 
   // ---------- 手札の表示順（並び替え） ----------
   motifOrder(c) {
-    if (c.wild) return 0;
-    const idx = DONJARA_MOTIFS.findIndex((m) => m.id === c.motif);
-    return idx < 0 ? 99 : idx + 1;
+    return cardSortKey(c)[0];
   }
 
   /** 保持している手札配列を柄順（オールマイティ先頭）に並べ替える */
   sortHand(cards) {
-    return cards.sort((a, b) => this.motifOrder(a) - this.motifOrder(b));
+    cards.sort(compareCards);
+    return cards;
   }
 
   /** 表示用の手札も同じ順序で返す */
   applyDisplayOrder(cards) {
-    return cards.slice().sort((a, b) => this.motifOrder(a) - this.motifOrder(b));
+    return sortCards(cards);
   }
 
   selfHandRef() {
@@ -493,6 +441,7 @@ class DonjaraGame {
     this.state.wonFlags = [false, false];
     this.state.riichi = [false, false];
     this.state.riichiAsked = [false, false];
+    this.state.ippatsuPending = [false, false];
     this.state.roundResult = null;
     this.state.phase = 'play';
 
@@ -530,6 +479,7 @@ class DonjaraGame {
 
     // ツモあがり可能か
     const winInfo = this.canWinByDraw(i);
+    const ippatsu = this.state.ippatsuPending[i];
     // bug010: ツモ牌は自分の selfDraw にのみ表示し、メッセージには載せない（PvPで相手に漏れないように）
     this.state.msg = this.turnLabel(i);
     this.logState('ツモ');
@@ -540,17 +490,18 @@ class DonjaraGame {
       if (winInfo) {
         const want = await this.ask(i, 'win', 'ツモ');
         if (want) {
-          await this.endRound(i, 'ツモあがり', winInfo);
+          await this.endRound(i, 'ツモあがり', winInfo, { ippatsu });
           return;
         }
       }
     } else {
       const want = this.ai.decideWin(winInfo);
       if (want && winInfo) {
-        await this.endRound(i, 'ツモあがり', winInfo);
+        await this.endRound(i, 'ツモあがり', winInfo, { ippatsu });
         return;
       }
     }
+    this.state.ippatsuPending[i] = false;
 
     // 打牌選択（リーチは捨てる牌が決まった時点で宣言する → bug008/009）
     const discardId = await this.ask(i, 'discard');
@@ -561,15 +512,16 @@ class DonjaraGame {
 
     // 相手の反応: ロンあがり → ポン → なし
     const oppWin = this.canWinByDiscard(opp);
+    const oppIppatsu = this.state.ippatsuPending[opp];
     if (oppWin && this.players[opp].kind !== 'ai') {
       const want = await this.ask(opp, 'win', 'ロン');
       if (want) {
-        await this.endRound(opp, 'ロン（相手の捨て牌であがり）', oppWin);
+        await this.endRound(opp, 'ロン（相手の捨て牌であがり）', oppWin, { ippatsu: oppIppatsu });
         return;
       }
     } else if (oppWin && this.players[opp].kind === 'ai') {
       if (this.ai.decideWin(oppWin)) {
-        await this.endRound(opp, 'ロン（相手の捨て牌であがり）', oppWin);
+        await this.endRound(opp, 'ロン（相手の捨て牌であがり）', oppWin, { ippatsu: oppIppatsu });
         return;
       }
     }
@@ -601,12 +553,15 @@ class DonjaraGame {
         const discardId2 = await this.ask(opp, 'discard');
         const reach2 = await this.maybeRiichiOnDiscard(opp, this.discardCardOf(opp, discardId2));
         this.doDiscard(opp, discardId2, { riichi: reach2 });
+        this.state.ippatsuPending[i] = false;
         // 打牌後の反応はなし（簡略）→ 元のプレイヤーへ
         await this.sleep(400);
         await this.playTurn(i);
         return;
       }
     }
+
+    this.state.ippatsuPending[opp] = false;
 
     // 反応なし → 相手がツモ
     await this.playTurn(opp);
@@ -639,6 +594,7 @@ class DonjaraGame {
     if (this.players[i].kind === 'ai') {
       this.state.riichi[i] = true;
       this.state.riichiAsked[i] = true;
+      this.state.ippatsuPending[i] = true;
       this.state.msg = `🔔 ${this.playerName(i)} がリーチを宣言しました`;
       this.render();
       if (this.mode === 'pvpHost' && i === 1) await this.sendSync();
@@ -648,6 +604,7 @@ class DonjaraGame {
     const want = await this.ask(i, 'riichi');
     this.state.riichi[i] = want;
     this.state.riichiAsked[i] = true;
+    this.state.ippatsuPending[i] = want;
     if (want) {
       this.state.msg = `🔔 ${this.playerName(i)} がリーチを宣言しました`;
     } else {
@@ -687,14 +644,14 @@ class DonjaraGame {
     this.render();
   }
 
-  async endRound(winner, reason, winInfo) {
+  async endRound(winner, reason, winInfo, extraContext = {}) {
     this.state.phase = 'roundEnd';
     this.state.msg = '';
 
     let points = 0;
     let yaku = [];
     if (winner !== null) {
-      const sc = scoreYaku(winInfo.groups, winInfo.jokersUsed);
+      const sc = scoreYaku(winInfo.groups, winInfo.jokersUsed, extraContext);
       yaku = sc.yaku;
       points = sc.total;
       this.state.scores[winner] += points;
@@ -1180,17 +1137,21 @@ if (typeof module !== 'undefined' && module.exports) {
     WILD,
     buildDeck,
     shuffle,
+    compareCards,
+    sortCards,
+    sortGroups,
     countMotifs,
     analyzeWin,
     analyzeWin9,
     isTenpai,
     scoreYaku,
-    Yaku,
-    BasicYaku,
-    AllSameMotifYaku,
-    AllDifferentMotifYaku,
-    NoWildYaku,
-    YakuManager,
+    Yaku: window.Yaku,
+    BasicYaku: window.DONJARA_YAKU_CLASSES.BasicYaku,
+    AllSameMotifYaku: window.DONJARA_YAKU_CLASSES.AllSameMotifYaku,
+    AllDifferentMotifYaku: window.DONJARA_YAKU_CLASSES.AllDifferentMotifYaku,
+    NoWildYaku: window.DONJARA_YAKU_CLASSES.NoWildYaku,
+    IppatsuYaku: window.DONJARA_YAKU_CLASSES.IppatsuYaku,
+    YakuManager: window.YakuManager,
     DonjaraAI,
     DonjaraGame
   };
