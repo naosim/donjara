@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ドンジャラ 対局 (Step 2 - P2P / AI対戦)</title>
+  <style>
+    :root {
+      --primary: #4F46E5;
+      --primary-hover: #4338CA;
+      --bg-color: #F3F4F6;
+      --card-bg: #FFFFFF;
+      --text-color: #1F2937;
+      --text-muted: #6B7280;
+      --danger: #EF4444;
+      --danger-hover: #DC2626;
+      --success: #10B981;
+      --accent: #F59E0B;
+      --border-radius: 12px;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    :root[data-theme="eink"] {
+      --primary: #000000;
+      --primary-hover: #222222;
+      --bg-color: #FFFFFF;
+      --card-bg: #FFFFFF;
+      --text-color: #000000;
+      --text-muted: #222222;
+      --danger: #000000;
+      --danger-hover: #222222;
+      --success: #000000;
+      --accent: #000000;
+      --border-radius: 4px;
+      --shadow: none;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      padding: 16px;
+      max-width: 800px;
+      margin: 0 auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #E5E7EB;
+    }
+
+    [data-theme="eink"] header {
+      border-bottom: 3px solid #000000;
+    }
+
+    h1 {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .header-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 14px;
+      font-size: 0.9rem;
+    }
+
+    [data-theme="eink"] button {
+      border: 2px solid #000000;
+      font-weight: 700;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: #E5E7EB;
+      color: var(--text-color);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #D1D5DB;
+    }
+
+    .btn-danger {
+      background: #FEE2E2;
+      color: var(--danger);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: #FCA5A5;
+    }
+
+    .btn-accent {
+      background: #FEF3C7;
+      color: #D97706;
+    }
+
+    [data-theme="eink"] .btn-primary {
+      background: #000000;
+      color: #FFFFFF;
+    }
+
+    [data-theme="eink"] .btn-secondary,
+    [data-theme="eink"] .btn-accent,
+    [data-theme="eink"] .btn-danger {
+      background: #FFFFFF;
+      color: #000000;
+      border: 2px solid #000000;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--border-radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+      margin-bottom: 16px;
+      border: 1px solid #E5E7EB;
+    }
+
+    [data-theme="eink"] .card {
+      border: 2px solid #000000;
+      box-shadow: none;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #F9FAFB;
+      border: 1px solid #E5E7EB;
+      margin-bottom: 12px;
+    }
+
+    [data-theme="eink"] .status-bar {
+      border: 2px solid #000000;
+      background: #FFFFFF;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: #E5E7EB;
+      color: var(--text-color);
+    }
+
+    .status-badge.connected {
+      background: #D1FAE5;
+      color: #065F46;
+    }
+
+    .status-badge.connecting {
+      background: #FEF3C7;
+      color: #92400E;
+    }
+
+    .status-badge.error {
+      background: #FEE2E2;
+      color: #991B1B;
+    }
+
+    [data-theme="eink"] .status-badge {
+      border: 1px solid #000000;
+      background: #FFFFFF;
+      color: #000000;
+    }
+
+    [data-theme="eink"] .status-badge.connected {
+      background: #000000;
+      color: #FFFFFF;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: var(--text-muted);
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #D1D5DB;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    textarea.form-control {
+      resize: vertical;
+      min-height: 60px;
+      font-family: monospace;
+      font-size: 0.75rem;
+    }
+
+    [data-theme="eink"] .form-control {
+      border: 2px solid #000000;
+    }
+
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .step-title {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 6px;
+    }
+
+    .qr-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      background: #FFFFFF;
+      border: 2px dashed #D1D5DB;
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+
+    [data-theme="eink"] .qr-container {
+      border: 2px solid #000000;
+    }
+
+    .qr-canvas {
+      max-width: 180px;
+      max-height: 180px;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      padding: 16px;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-card {
+      background: white;
+      width: 100%;
+      max-width: 440px;
+      border-radius: var(--border-radius);
+      padding: 16px;
+      text-align: center;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+    }
+
+    [data-theme="eink"] .modal-card {
+      border: 3px solid #000000;
+      box-shadow: none;
+    }
+
+    .video-preview {
+      width: 100%;
+      height: 260px;
+      object-fit: cover;
+      border-radius: 8px;
+      background: #000000;
+      margin: 10px 0;
+      border: 2px solid #D1D5DB;
+    }
+
+    .alert-box {
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      color: #1E40AF;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
+    [data-theme="eink"] .alert-box {
+      background: #FFFFFF;
+      border: 2px solid #000000;
+      color: #000000;
+    }
+
+    .code-display {
+      position: relative;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      padding: 4px 8px;
+      font-size: 0.75rem;
+    }
+
+    /* ------- 対局ボード ------- */
+    .game-board {
+      display: none;
+    }
+
+    .board-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .board-head .chip {
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: #EEF2FF;
+      color: var(--primary);
+    }
+
+    [data-theme="eink"] .board-head .chip {
+      border: 1px solid #000000;
+      background: #FFFFFF;
+      color: #000000;
+    }
+
+    .msg-line {
+      font-size: 0.95rem;
+      font-weight: 700;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #F9FAFB;
+      border: 1px solid #E5E7EB;
+      min-height: 42px;
+      margin-bottom: 12px;
+    }
+
+    [data-theme="eink"] .msg-line {
+      border: 2px solid #000000;
+      background: #FFFFFF;
+    }
+
+    .player-block {
+      margin-bottom: 12px;
+    }
+
+    .player-label {
+      font-size: 0.8rem;
+      font-weight: 800;
+      margin-bottom: 4px;
+      color: var(--text-muted);
+    }
+
+    .river {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      min-height: 46px;
+      padding: 6px;
+      border: 1px solid #E5E7EB;
+      border-radius: 8px;
+      background: #F9FAFB;
+    }
+
+    [data-theme="eink"] .river {
+      border: 2px solid #000000;
+      background: #FFFFFF;
+    }
+
+    .hand {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .meld {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+      align-items: center;
+    }
+
+    .d-meld-row {
+      display: flex;
+      gap: 3px;
+      align-items: center;
+      border: 2px solid var(--primary);
+      border-color: rgba(24, 107, 64, 0.35);
+      border-radius: 8px;
+      padding: 3px;
+    }
+
+    .d-meld-tag {
+      font-size: 0.6rem;
+      font-weight: 800;
+      color: var(--primary);
+      writing-mode: vertical-rl;
+      text-orientation: upright;
+      letter-spacing: 0.5px;
+    }
+
+    .d-card {
+      width: 58px;
+      height: 76px;
+      position: relative;
+      border: 2px solid #000000;
+      border-radius: 8px;
+      background: #FFFFFF;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      user-select: none;
+    }
+
+    .d-card-emoji {
+      font-size: 1.5rem;
+      line-height: 1;
+    }
+
+    .d-card-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+    }
+
+    .d-card-back {
+      background: repeating-linear-gradient(45deg, #E5E7EB, #E5E7EB 6px, #D1D5DB 6px, #D1D5DB 12px);
+      font-size: 1.8rem;
+    }
+
+    [data-theme="eink"] .d-card-back {
+      border: 2px dashed #000000;
+      background: #FFFFFF;
+    }
+
+    .d-wild {
+      border-color: var(--primary);
+    }
+
+    .d-draw {
+      border-width: 3px;
+      border-style: dashed;
+      box-shadow: 0 0 0 2px var(--primary);
+    }
+
+    /* リーチ宣言した捨て牌の印（bug009） */
+    .d-riichi {
+      background: #FFF3CD;
+      border-color: #FF8F00;
+      box-shadow: 0 0 0 2px #FFE082;
+    }
+
+    [data-theme="eink"] .d-riichi {
+      background: #FFFFFF;
+      border-color: #000000;
+      border-style: solid;
+      box-shadow: none;
+      outline: 3px solid #000000;
+    }
+
+    .d-riichi-tag {
+      position: absolute;
+      top: -15px;
+      left: -2px;
+      font-size: 9px;
+      line-height: 1.4;
+      background: #FF8F00;
+      color: #FFFFFF;
+      border-radius: 8px;
+      padding: 0 5px;
+      white-space: nowrap;
+      z-index: 2;
+    }
+
+    [data-theme="eink"] .d-riichi-tag {
+      background: #000000;
+    }
+
+    .d-clickable {
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+
+    .d-clickable:hover {
+      transform: translateY(-4px);
+    }
+
+    .action-area {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      min-height: 44px;
+    }
+
+    .hint {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--primary);
+      padding: 8px 12px;
+      background: #EEF2FF;
+      border-radius: 8px;
+    }
+
+    [data-theme="eink"] .hint {
+      border: 2px solid #000000;
+      background: #FFFFFF;
+      color: #000000;
+    }
+
+    .result-banner {
+      min-height: 40px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+    }
+
+    .result-banner.winner {
+      background: #D1FAE5;
+      color: #065F46;
+    }
+
+    .result-banner.flow {
+      background: #FEF3C7;
+      color: #92400E;
+    }
+
+    [data-theme="eink"] .result-banner {
+      border: 2px solid #000000;
+      background: #FFFFFF;
+      color: #000000;
+    }
+
+    .gameover-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      padding: 16px;
+    }
+
+    .gameover-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .gameover-card {
+      background: white;
+      width: 100%;
+      max-width: 420px;
+      border-radius: var(--border-radius);
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+    }
+
+    [data-theme="eink"] .gameover-card {
+      border: 3px solid #000000;
+      box-shadow: none;
+    }
+
+    .gameover-card h2 {
+      margin-bottom: 12px;
+      font-size: 1.4rem;
+    }
+
+    .final-result {
+      font-size: 1rem;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+  </style>
+  <script src="qrcode.js?v=11"></script>
+  <script src="p2p.js?v=11"></script>
+  <script src="game.js?v=11"></script>
+</head>
+
+<body>
+
+  <header>
+    <h1>🎴 ドンジャラ対局 <span style="font-size:0.75rem; font-weight:normal;">(Step 2)</span></h1>
+    <div class="header-btns">
+      <button class="btn-secondary" onclick="app.showShareQR()">🔗 URL QR</button>
+      <button class="btn-secondary" onclick="location.href='chat.html'">💬 チャット</button>
+      <button class="btn-secondary" onclick="app.toggleTheme()">🌓 E-Ink</button>
+    </div>
+  </header>
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <div>
+      <span style="font-size: 0.85rem; color: var(--text-muted);">ステータス:</span>
+      <span id="statusBadge" class="status-badge">未接続</span>
+    </div>
+    <div id="roleDisplay" style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted);">モード未選択</div>
+  </div>
+
+  <!-- Mode Selection -->
+  <div class="card" id="modePanel">
+    <div class="step-title" style="font-size: 1rem;">対戦モードを選択</div>
+    <div class="btn-grid" style="grid-template-columns: 1fr;">
+      <button class="btn-primary" id="vpBtn" onclick="app.startVsComputer()">🎮 人間 vs コンピュータ</button>
+      <button class="btn-primary" onclick="app.setupPvp()">📱 2台対戦 (PvP)</button>
+    </div>
+    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:10px;">
+      4局（交換）の総得点で勝敗を決めます。9柄×9枚＋ジョーカー2枚＝83枚のデッキを使用。
+      3枚組×3組にそろえて「ドンジャラ！」を宣言する（最大45pt）。
+    </p>
+  </div>
+
+  <!-- PvP Role Selection -->
+  <div class="card" id="pvpRolePanel" style="display: none;">
+    <div class="step-title">2台対戦: 役割を選択</div>
+    <div class="btn-grid">
+      <button class="btn-primary" onclick="app.setupPvpHost()">📱 親機 (Host)</button>
+      <button class="btn-primary" onclick="app.setupPvpGuest()">🔍 子機 (Guest)</button>
+    </div>
+    <button class="btn-secondary" style="width: 100%; margin-top: 10px;" onclick="app.backToMode()">← モード選択に戻る</button>
+  </div>
+
+  <!-- Host Panel -->
+  <div class="card" id="hostPanel" style="display: none;">
+    <div class="step-title">【親機 1/2】 招待QRコードを表示</div>
+    <p style="font-size:0.8rem; color:var(--text-muted);">子機のカメラで以下のQRコードを読み取ってもらってください。</p>
+
+    <div class="qr-container">
+      <canvas id="hostOfferCanvas" class="qr-canvas"></canvas>
+    </div>
+
+    <div class="form-group code-display">
+      <textarea id="hostOfferCode" class="form-control" readonly placeholder="招待コード生成中..."></textarea>
+      <button class="btn-secondary copy-btn" onclick="app.copyCode('hostOfferCode')">📋 コピー</button>
+    </div>
+
+    <div class="step-title" style="margin-top: 16px;">【親機 2/2】 子機の応答コードを受け取る</div>
+    <button class="btn-primary" style="width: 100%; margin-bottom: 8px;" onclick="app.openScanner('host')">📷 カメラで子機の応答QRコードを読み取る</button>
+
+    <div class="form-group">
+      <textarea id="hostAnswerInput" class="form-control" placeholder="または、子機からの応答コードをここに貼り付け..."></textarea>
+    </div>
+    <button class="btn-secondary" style="width: 100%;" onclick="app.acceptGuestAnswer()">接続を完了する (手動確定)</button>
+  </div>
+
+  <!-- Guest Panel -->
+  <div class="card" id="guestPanel" style="display: none;">
+    <div class="step-title">【子機 1/2】 親機の招待コードを読み取る</div>
+    <button class="btn-primary" style="width: 100%; margin-bottom: 8px;" onclick="app.openScanner('guest')">📷 カメラで親機の招待QRコードをかざす</button>
+
+    <div class="form-group">
+      <textarea id="guestOfferInput" class="form-control" placeholder="または、親機の招待コードをここに貼り付け..."></textarea>
+    </div>
+    <button class="btn-secondary" style="width: 100%; margin-bottom: 16px;" onclick="app.createGuestAnswer()">応答コードを手動発行する</button>
+
+    <div id="guestAnswerSection" style="display: none;">
+      <div class="step-title">【子機 2/2】 応答QRコードを親機に見せる</div>
+      <p style="font-size:0.8rem; color:var(--text-muted);">親機のカメラで以下のQRコードをかざしてもらってください。</p>
+
+      <div class="qr-container">
+        <canvas id="guestAnswerCanvas" class="qr-canvas"></canvas>
+      </div>
+
+      <div class="form-group code-display">
+        <textarea id="guestAnswerCode" class="form-control" readonly placeholder="応答コード..."></textarea>
+        <button class="btn-secondary copy-btn" onclick="app.copyCode('guestAnswerCode')">📋 コピー</button>
+      </div>
+    </div>
+    <button class="btn-secondary" style="width: 100%; margin-top: 10px;" onclick="app.backToMode()">← モード選択に戻る</button>
+  </div>
+
+  <!-- Connection Guide -->
+  <div class="alert-box">
+    📷 <strong>2台対戦のつなぎ方:</strong><br>
+    1. 1台目を「親機」にし、表示される <strong>招待QRコード</strong> を出します。<br>
+    2. 2台目を「子機」にし、「📷 カメラでかざす」で親機のQRコードをスキャン。<br>
+    3. 子機に出る <strong>応答QRコード</strong> を親機のカメラでかざすと <strong>P2P接続完了</strong>！親機が対局を開始します。
+  </div>
+
+  <!-- Game Board -->
+  <div class="card game-board" id="gameBoard">
+    <div class="board-head">
+      <span class="chip" id="roundLabel"></span>
+      <span class="chip" id="score0"></span>
+      <span class="chip" id="score1"></span>
+      <span class="chip" id="wallCount"></span>
+    </div>
+
+    <div class="msg-line" id="msg">...</div>
+
+    <div class="player-block">
+      <div class="player-label" id="oppInfo">相手</div>
+      <div class="river" id="oppRiver"></div>
+      <div class="hand" id="oppHandBack"></div>
+      <div class="meld" id="oppMeld"></div>
+    </div>
+
+    <div class="player-block">
+      <div class="player-label">あなた</div>
+      <div class="river" id="selfRiver"></div>
+      <div class="meld" id="selfMeld"></div>
+      <div class="hand" id="selfHand"></div>
+      <div class="hand" id="selfDraw"></div>
+    </div>
+
+    <div class="action-area" id="actions"></div>
+    <div class="result-banner" id="roundResult"></div>
+
+    <button class="btn-danger" style="width: 100%; margin-top: 14px;" onclick="app.resetAll()">対局をやめて初期画面に戻る</button>
+  </div>
+
+  <!-- Camera Scanner Modal -->
+  <div class="modal-overlay" id="cameraModal">
+    <div class="modal-card">
+      <h3 style="font-size:1.1rem; margin-bottom: 6px;">📷 QRコードスキャナー</h3>
+      <p style="font-size:0.8rem; color: var(--text-muted);">相手の画面に表示されたQRコードをカメラ枠内にかざしてください。</p>
+
+      <video id="videoPreview" class="video-preview" playsinline autoplay></video>
+      <div id="scanStatus" style="font-size:0.85rem; font-weight:700; color:var(--primary); margin-bottom: 10px;">スキャン準備中...</div>
+
+      <button class="btn-secondary" style="width: 100%;" onclick="app.closeScanner()">キャンセル / 閉じる</button>
+    </div>
+  </div>
+
+  <!-- Share URL Modal -->
+  <div class="modal-overlay" id="shareModal">
+    <div class="modal-card">
+      <h3 style="font-size:1.1rem; margin-bottom: 6px;">🔗 このサイトを友達に共有</h3>
+      <p style="font-size:0.8rem; color: var(--text-muted);">以下のQRコードを読み取るか、URLを送ってアクセスしてもらってください。</p>
+
+      <div class="qr-container">
+        <canvas id="shareQRCanvas" class="qr-canvas"></canvas>
+      </div>
+
+      <div class="form-group code-display" style="margin-bottom: 10px;">
+        <textarea id="shareUrlInput" class="form-control" readonly placeholder="URLを取得中..."></textarea>
+        <button class="btn-secondary copy-btn" onclick="app.copyCode('shareUrlInput')">📋 コピー</button>
+      </div>
+
+      <button class="btn-secondary" style="width: 100%;" onclick="app.closeShareModal()">閉じる</button>
+    </div>
+  </div>
+
+  <!-- Game Over Overlay -->
+  <div class="gameover-overlay" id="gameOverOverlay">
+    <div class="gameover-card">
+      <h2>🏁 対局終了</h2>
+      <div class="final-result" id="finalResult"></div>
+      <button class="btn-primary" style="width: 100%;" onclick="app.resetAll()">もう一度 / メニューへ</button>
+    </div>
+  </div>
+
+  <script>
+    class DonjaraGameApp {
+      constructor() {
+        this.state = {
+          theme: 'default',
+          p2pRole: null,
+          scannerTarget: null
+        };
+        this.conn = null;
+        this.game = null;
+        this.init();
+      }
+
+      init() {
+        const savedTheme = localStorage.getItem('donjara_game_theme');
+        if (savedTheme) this.state.theme = savedTheme;
+        this.applyTheme();
+      }
+
+      applyTheme() {
+        document.documentElement.setAttribute('data-theme', this.state.theme || 'default');
+      }
+
+      toggleTheme() {
+        this.state.theme = this.state.theme === 'eink' ? 'default' : 'eink';
+        localStorage.setItem('donjara_game_theme', this.state.theme);
+        this.applyTheme();
+      }
+
+      // ---------- モード遷移 ----------
+      backToMode() {
+        this.resetAll();
+        document.getElementById('modePanel').style.display = 'block';
+      }
+
+      async startVsComputer() {
+        this.resetAll(false);
+        document.getElementById('modePanel').style.display = 'none';
+        this.setStatus('connected', '人間 vs コンピュータ');
+        this.showGameBoard();
+        this.game = new DonjaraGame('ai');
+        this.game.startGame();
+      }
+
+      async setupPvp() {
+        document.getElementById('modePanel').style.display = 'none';
+        document.getElementById('pvpRolePanel').style.display = 'block';
+        this.setStatus('none', '2台対戦');
+      }
+
+      async setupPvpHost() {
+        this.state.p2pRole = 'host';
+        document.getElementById('pvpRolePanel').style.display = 'none';
+        document.getElementById('hostPanel').style.display = 'block';
+        this.createConnection();
+        this.setStatus('connecting', '親機 (Host)');
+
+        try {
+          const offerCode = await this.conn.buildOffer();
+          document.getElementById('hostOfferCode').value = offerCode;
+          this.safeRenderQR('hostOfferCanvas', offerCode, '【親機招待QR】');
+        } catch (err) {
+          console.error('Create Offer Error:', err);
+          alert('招待コードの生成に失敗しました。');
+        }
+      }
+
+      async setupPvpGuest() {
+        this.state.p2pRole = 'guest';
+        document.getElementById('pvpRolePanel').style.display = 'none';
+        document.getElementById('guestPanel').style.display = 'block';
+        this.createConnection();
+        this.setStatus('connecting', '子機 (Guest)');
+      }
+
+      createConnection() {
+        if (this.conn) {
+          try { this.conn.disconnect(); } catch (e) {}
+        }
+        const self = this;
+        this.conn = new P2PConnection({
+          onOpen: () => {
+            this.setStatus('connected', this.state.p2pRole === 'host' ? '親機 (Host)' : '子機 (Guest)');
+            this.startPvpGame();
+          },
+          onClose: () => {
+            this.setStatus('disconnected', 'none');
+          },
+          onUnexpectedClose: () => {
+            this.setStatus('disconnected', 'none');
+            alert('通信が切断されました。');
+          },
+          onMessage: (packet) => {
+            if (!this.game || !packet) return;
+            if (this.state.p2pRole === 'host') this.game.handleHostMessage(packet);
+            else this.game.handleGuestMessage(packet);
+          }
+        });
+      }
+
+      startPvpGame() {
+        this.showGameBoard();
+        document.getElementById('hostPanel').style.display = 'none';
+        document.getElementById('guestPanel').style.display = 'none';
+        document.getElementById('guestAnswerSection').style.display = 'none';
+        if (this.state.p2pRole === 'host') {
+          this.game = new DonjaraGame('pvpHost', { conn: this.conn });
+          this.game.startGame();
+        } else {
+          // 子機側の game は buildAnswer 完了時に作成済み（初回 sync を取りこぼさないため）
+          const msg = document.getElementById('msg');
+          if (msg) msg.innerText = '接続完了！親機の対局開始を待っています...';
+        }
+      }
+
+      async acceptGuestAnswer(codeParam) {
+        const answerCode = codeParam || document.getElementById('hostAnswerInput')?.value.trim();
+        if (!answerCode) {
+          alert('子機からの応答コードを貼り付けるかカメラでスキャンしてください。');
+          return;
+        }
+        try {
+          await this.conn.acceptAnswer(answerCode);
+          this.setStatus('connecting', '親機 (Host)');
+        } catch (err) {
+          console.error('Accept Answer Error:', err);
+          alert('応答コードの形式が不正です。');
+        }
+      }
+
+      async createGuestAnswer(codeParam) {
+        const offerCode = codeParam || document.getElementById('guestOfferInput')?.value.trim();
+        if (!offerCode) {
+          alert('親機の招待コードを入力するかカメラでスキャンしてください。');
+          return;
+        }
+        try {
+          const answerCode = await this.conn.buildAnswer(offerCode);
+          document.getElementById('guestAnswerCode').value = answerCode;
+          document.getElementById('guestAnswerSection').style.display = 'block';
+          this.safeRenderQR('guestAnswerCanvas', answerCode, '【子機応答QR】');
+          this.game = new DonjaraGame('pvpGuest', { conn: this.conn });
+        } catch (err) {
+          console.error('Create Answer Error:', err);
+          alert('招待コードの読み取り/解析に失敗しました。');
+        }
+      }
+
+      // ---------- カメラQR ----------
+      async openScanner(targetRole) {
+        this.state.scannerTarget = targetRole;
+        const modal = document.getElementById('cameraModal');
+        const video = document.getElementById('videoPreview');
+        const statusText = document.getElementById('scanStatus');
+        if (modal) modal.classList.add('active');
+        if (statusText) statusText.innerText = 'カメラを起動中...';
+
+        try {
+          await this.conn.startScanner(video, {
+            onResult: (qrText) => this.handleScannedResult(qrText),
+            onUnsupported: () => {
+              if (statusText) statusText.innerText = '📷 カメラプレビュー中（コードは自動認識されません）';
+            }
+          });
+          if (statusText) statusText.innerText = '🔍 QRコードを枠内にあわせてください...';
+        } catch (err) {
+          console.error('Camera Access Error:', err);
+          alert('カメラへのアクセスが拒否されたか、利用できません。テキストコードのコピー＆ペーストをご利用ください。');
+          this.closeScanner();
+        }
+      }
+
+      handleScannedResult(scannedText) {
+        if (!scannedText) return;
+        const statusText = document.getElementById('scanStatus');
+        if (statusText) statusText.innerText = '✅ QRコードを検出しました！';
+        this.closeScanner();
+
+        if (this.state.scannerTarget === 'guest') {
+          const input = document.getElementById('guestOfferInput');
+          if (input) input.value = scannedText;
+          this.createGuestAnswer(scannedText);
+        } else if (this.state.scannerTarget === 'host') {
+          const input = document.getElementById('hostAnswerInput');
+          if (input) input.value = scannedText;
+          this.acceptGuestAnswer(scannedText);
+        }
+      }
+
+      closeScanner() {
+        if (this.conn) this.conn.stopScanner();
+        const modal = document.getElementById('cameraModal');
+        if (modal) modal.classList.remove('active');
+      }
+
+      // ---------- 画面制御 ----------
+      showGameBoard() {
+        document.getElementById('pvpRolePanel').style.display = 'none';
+        document.getElementById('hostPanel').style.display = 'none';
+        document.getElementById('guestPanel').style.display = 'none';
+        document.getElementById('gameBoard').style.display = 'block';
+      }
+
+      resetAll(showModePanel = true) {
+        if (this.game) { this.game = null; }
+        if (this.conn) {
+          try { this.conn.disconnect(); } catch (e) {}
+          this.conn = null;
+        }
+        document.getElementById('modePanel').style.display = showModePanel ? 'block' : 'none';
+        document.getElementById('pvpRolePanel').style.display = 'none';
+        document.getElementById('hostPanel').style.display = 'none';
+        document.getElementById('guestPanel').style.display = 'none';
+        document.getElementById('gameBoard').style.display = 'none';
+        const over = document.getElementById('gameOverOverlay');
+        if (over) over.classList.remove('active');
+        this.setStatus('disconnected', 'none');
+      }
+
+      // ---------- QR / UI ヘルパー ----------
+      safeRenderQR(canvasId, textCode, label = '') {
+        try {
+          if (typeof QRCode !== 'undefined' && QRCode.renderQRCode) {
+            QRCode.renderQRCode(canvasId, textCode, 180);
+          } else {
+            throw new Error('QRCode ライブラリが初期化されていません');
+          }
+        } catch (err) {
+          console.error('[QR Error]', label, err.message);
+        }
+      }
+
+      showShareQR() {
+        const url = window.location.href;
+        const input = document.getElementById('shareUrlInput');
+        if (input) input.value = url;
+        this.safeRenderQR('shareQRCanvas', url, '【共有QR】');
+        const modal = document.getElementById('shareModal');
+        if (modal) modal.classList.add('active');
+      }
+
+      closeShareModal() {
+        const modal = document.getElementById('shareModal');
+        if (modal) modal.classList.remove('active');
+      }
+
+      copyCode(elementId) {
+        const textarea = document.getElementById(elementId);
+        if (textarea) {
+          textarea.select();
+          document.execCommand('copy');
+          alert('コードをクリップボードにコピーしました！');
+        }
+      }
+
+      setStatus(status, role = 'none') {
+        const badge = document.getElementById('statusBadge');
+        const roleDisp = document.getElementById('roleDisplay');
+        if (badge) {
+          badge.className = `status-badge ${status}`;
+          if (status === 'connected') badge.innerText = '● 接続完了';
+          else if (status === 'connecting') badge.innerText = '⏳ 接続手続中...';
+          else if (status === 'error') badge.innerText = '⚠️ エラー';
+          else badge.innerText = '未接続';
+        }
+        if (roleDisp) {
+          roleDisp.innerText = `現在: ${role}`;
+        }
+      }
+    }
+
+    const app = new DonjaraGameApp();
+  </script>
+</body>
+
+</html>

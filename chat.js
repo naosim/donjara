@@ -1,5 +1,28 @@
-class WebRTCP2PChat {
+class WebRTCP2PChat extends P2PConnection {
   constructor() {
+    super({
+      onOpen: () => {
+        this.setStatus('connected', this.state.role);
+        this.addSystemLog('🎉 WebRTC P2P 接続が開通しました！チャットが可能です。');
+      },
+      onClose: () => {
+        this.setStatus('disconnected', 'none');
+        this.addSystemLog('P2P DataChannel が閉じられました。');
+      },
+      onUnexpectedClose: () => {
+        this.setStatus('disconnected', 'none');
+        this.addSystemLog('通信が切断されました。');
+      },
+      onSendFailed: () => {
+        this.addSystemLog('⚠️ 通信チャネルが開いていないためメッセージを送信できません。');
+      },
+      onMessage: (packet) => {
+        if (packet && packet.type === 'chat') {
+          this.addMessageBubble(packet, false);
+        }
+      }
+    });
+
     this.state = {
       role: 'none',
       status: 'disconnected',
@@ -8,11 +31,6 @@ class WebRTCP2PChat {
       simulationMode: false,
       scannerTarget: null
     };
-
-    this.pc = null;
-    this.dataChannel = null;
-    this.mediaStream = null;
-    this.scanInterval = null;
 
     if (typeof window !== 'undefined') {
       this.init();
@@ -70,109 +88,6 @@ class WebRTCP2PChat {
     }
   }
 
-  createPeerConnection() {
-    const config = {
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-    };
-    this.pc = new RTCPeerConnection(config);
-
-    this.pc.oniceconnectionstatechange = () => {
-      if (this.pc.iceConnectionState === 'disconnected' || this.pc.iceConnectionState === 'failed') {
-        this.setStatus('disconnected', 'none');
-        this.addSystemLog('通信が切断されました。');
-      }
-    };
-
-    return this.pc;
-  }
-
-  // --- Ultra-Compact Custom SDP Formatter (30-60 chars for huge QR dots) ---
-  compressSdp(sdpInit) {
-    if (!sdpInit || !sdpInit.sdp) return '';
-    const lines = sdpInit.sdp.split('\r\n');
-    let ufrag = '', pwd = '', fp = '';
-    const candList = [];
-
-    for (const line of lines) {
-      if (line.startsWith('a=ice-ufrag:')) ufrag = line.split(':')[1];
-      else if (line.startsWith('a=ice-pwd:')) pwd = line.split(':')[1];
-      else if (line.startsWith('a=fingerprint:sha-256 ')) {
-        fp = line.split(' ')[1].replace(/:/g, ''); // Remove colons
-      } else if (line.startsWith('a=candidate:')) {
-        const parts = line.substring(12).split(' ');
-        if (parts.length >= 8) {
-          // IP, Port, Type (セミコロン区切りでIPv6アドレスのコロンと衝突しないようにする)
-          candList.push(`${parts[4]};${parts[5]};${parts[7]}`);
-        }
-      }
-    }
-
-    const typeFlag = sdpInit.type === 'offer' ? 'O' : 'A';
-    // Format: O,ufrag,pwd,fp,ip1;port1;typ1|ip2;port2;typ2
-    return `${typeFlag},${ufrag},${pwd},${fp},${candList.join('|')}`;
-  }
-
-  decompressSdp(compressedStr) {
-    try {
-      const str = (compressedStr || '').trim();
-      
-      // Fallback for Base64 or JSON
-      if (str.startsWith('{') || str.startsWith('eyJ')) {
-        const rawJson = atob ? atob(str) : str;
-        const obj = JSON.parse(rawJson);
-        if (obj.sdp) return obj;
-      }
-
-      const parts = str.split(',');
-      if (parts.length < 4) throw new Error('コードフォーマットが不正です');
-
-      const typeFlag = parts[0];
-      const ufrag = parts[1];
-      const pwd = parts[2];
-      const rawFp = parts[3];
-      const candStr = parts[4] || '';
-
-      // Reformat Fingerprint (add colons back)
-      const fpFormatted = rawFp.match(/.{1,2}/g)?.join(':') || rawFp;
-
-      const type = typeFlag === 'O' ? 'offer' : 'answer';
-
-      let sdp = 'v=0\r\n' +
-        'o=- 1234567890 2 IN IP4 127.0.0.1\r\n' +
-        's=-\r\n' +
-        't=0 0\r\n' +
-        'a=msid-semantic: WMS\r\n' +
-        'm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\n' +
-        'c=IN IP4 0.0.0.0\r\n' +
-        'a=ice-ufrag:' + ufrag + '\r\n' +
-        'a=ice-pwd:' + pwd + '\r\n' +
-        'a=fingerprint:sha-256 ' + fpFormatted + '\r\n' +
-        'a=setup:' + (type === 'offer' ? 'actpass' : 'active') + '\r\n' +
-        'a=mid:0\r\n' +
-        'a=sctp-port:5000\r\n';
-
-      if (candStr) {
-        const cands = candStr.split('|');
-        cands.forEach((c, idx) => {
-          let f = c.split(';');
-          if (f.length < 2) f = c.split(':'); // 旧形式の相互互換
-          const ip = f[0];
-          const port = f[1];
-          const ctype = f[2];
-          // 不正ポート（非数値・IPv6誤分割）の候補はスキップしてSDPを壊さない
-          if (ip && /^\d+$/.test(port)) {
-            sdp += `a=candidate:${idx + 1} 1 udp ${2122260223 - idx} ${ip} ${port} typ ${ctype || 'host'}\r\n`;
-          }
-        });
-      }
-
-      return { type, sdp };
-    } catch (e) {
-      console.error('Decompress Error:', e);
-      throw new Error('コードの解読に失敗しました: ' + e.message);
-    }
-  }
-
   // --- Host Flow ---
   async setupHostMode() {
     this.state.userName = (document.getElementById('userNameInput')?.value || '').trim() || '親機';
@@ -182,22 +97,14 @@ class WebRTCP2PChat {
 
     this.addSystemLog('【親機】超極小招待コード（約40文字）＆特大ドットQRコードを生成中...');
 
-    const pc = this.createPeerConnection();
-
-    this.dataChannel = pc.createDataChannel('donjaraData');
-    this.setupDataChannelEvents(this.dataChannel);
-
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-
-    await this.waitForIceGathering(pc);
-
-    // Ultra-compact SDP Compression (approx. 40-50 chars)
-    const offerCode = this.compressSdp(pc.localDescription);
-    document.getElementById('hostOfferCode').value = offerCode;
-
-    // Draw QR Code
-    this.safeRenderQR('hostOfferCanvas', offerCode, '【親機招待QR】');
+    try {
+      const offerCode = await this.buildOffer();
+      document.getElementById('hostOfferCode').value = offerCode;
+      this.safeRenderQR('hostOfferCanvas', offerCode, '【親機招待QR】');
+    } catch (err) {
+      console.error('Create Offer Error:', err);
+      alert('招待コードの生成に失敗しました。');
+    }
   }
 
   safeRenderQR(canvasId, textCode, label = '') {
@@ -224,8 +131,7 @@ class WebRTCP2PChat {
     }
 
     try {
-      const answerSdp = this.decompressSdp(answerCode);
-      await this.pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
+      await this.acceptAnswer(answerCode);
       this.addSystemLog('【親機】子機からの応答を受理しました。P2P接続を確定中...');
     } catch (err) {
       console.error('Accept Answer Error:', err);
@@ -250,23 +156,7 @@ class WebRTCP2PChat {
     }
 
     try {
-      const offerSdp = this.decompressSdp(offerCode);
-      const pc = this.createPeerConnection();
-
-      pc.ondatachannel = (event) => {
-        this.dataChannel = event.channel;
-        this.setupDataChannelEvents(this.dataChannel);
-      };
-
-      await pc.setRemoteDescription(new RTCSessionDescription(offerSdp));
-
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-
-      await this.waitForIceGathering(pc);
-
-      // Ultra-compact Answer SDP
-      const answerCode = this.compressSdp(pc.localDescription);
+      const answerCode = await this.buildAnswer(offerCode);
       document.getElementById('guestAnswerCode').value = answerCode;
       document.getElementById('guestAnswerSection').style.display = 'block';
 
@@ -280,7 +170,7 @@ class WebRTCP2PChat {
     }
   }
 
-  // --- Camera Scanner Implementation ---
+  // --- Camera Scanner (UIはここで制御、スキャン本体はP2PConnection) ---
   async openScanner(targetRole) {
     this.state.scannerTarget = targetRole;
     const modal = document.getElementById('cameraModal');
@@ -291,33 +181,14 @@ class WebRTCP2PChat {
     if (statusText) statusText.innerText = 'カメラを起動中...';
 
     try {
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
+      await this.startScanner(video, {
+        onResult: (qrText) => this.handleScannedResult(qrText),
+        onUnsupported: () => {
+          if (statusText) statusText.innerText = '📷 カメラプレビュー中（コードは自動認識されません）';
+        }
       });
-      if (video) {
-        video.srcObject = this.mediaStream;
-        await video.play();
-      }
 
       if (statusText) statusText.innerText = '🔍 QRコードを枠内にあわせてください...';
-
-      if ('BarcodeDetector' in window) {
-        const barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
-        this.scanInterval = setInterval(async () => {
-          try {
-            if (video) {
-              const barcodes = await barcodeDetector.detect(video);
-              if (barcodes.length > 0) {
-                const qrText = barcodes[0].rawValue;
-                this.handleScannedResult(qrText);
-              }
-            }
-          } catch (e) {}
-        }, 300);
-      } else {
-        if (statusText) statusText.innerText = 'カメラプレビュー中（コードを自動認識しています）';
-        this.scanInterval = setInterval(() => {}, 500);
-      }
     } catch (err) {
       console.error('Camera Access Error:', err);
       alert('カメラへのアクセスが拒否されたか、利用できません。テキストコードのコピー＆ペーストをご利用ください。');
@@ -344,14 +215,7 @@ class WebRTCP2PChat {
   }
 
   closeScanner() {
-    if (this.scanInterval) {
-      clearInterval(this.scanInterval);
-      this.scanInterval = null;
-    }
-    if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach((track) => track.stop());
-      this.mediaStream = null;
-    }
+    this.stopScanner();
     const modal = document.getElementById('cameraModal');
     if (modal) modal.classList.remove('active');
   }
@@ -369,47 +233,6 @@ class WebRTCP2PChat {
   closeShareModal() {
     const modal = document.getElementById('shareModal');
     if (modal) modal.classList.remove('active');
-  }
-
-  // --- DataChannel Events ---
-  setupDataChannelEvents(channel) {
-    channel.onopen = () => {
-      this.setStatus('connected', this.state.role);
-      this.addSystemLog('🎉 WebRTC P2P 接続が開通しました！チャットが可能です。');
-    };
-
-    channel.onmessage = (e) => {
-      try {
-        const packet = JSON.parse(e.data);
-        if (packet.type === 'chat') {
-          this.addMessageBubble(packet, false);
-        }
-      } catch (err) {
-        console.error('Data Parse Error:', err);
-      }
-    };
-
-    channel.onclose = () => {
-      this.setStatus('disconnected', 'none');
-      this.addSystemLog('P2P DataChannel が閉じられました。');
-    };
-  }
-
-  waitForIceGathering(pc) {
-    return new Promise((resolve) => {
-      if (pc.iceGatheringState === 'complete') {
-        resolve();
-      } else {
-        const checkState = () => {
-          if (pc.iceGatheringState === 'complete') {
-            pc.removeEventListener('icegatheringstatechange', checkState);
-            resolve();
-          }
-        };
-        pc.addEventListener('icegatheringstatechange', checkState);
-        setTimeout(resolve, 1000);
-      }
-    });
   }
 
   sendMessage() {
@@ -442,23 +265,14 @@ class WebRTCP2PChat {
       return;
     }
 
-    if (this.dataChannel && this.dataChannel.readyState === 'open') {
-      this.dataChannel.send(JSON.stringify(packet));
-    } else {
+    if (!this.sendJSON(packet)) {
       this.addSystemLog('⚠️ 通信チャネルが開いていないためメッセージを送信できません。');
     }
   }
 
   disconnect() {
-    if (this.dataChannel) {
-      this.dataChannel.close();
-      this.dataChannel = null;
-    }
-    if (this.pc) {
-      this.pc.close();
-      this.pc = null;
-    }
     this.closeScanner();
+    super.disconnect();
     const hostPanel = document.getElementById('hostPanel');
     const guestPanel = document.getElementById('guestPanel');
     const guestAnswerSection = document.getElementById('guestAnswerSection');
