@@ -86,43 +86,56 @@ class WebRTCP2PChat {
     return this.pc;
   }
 
-  // --- SDP Minifier (Ultra-light 90% Compression for Easy QR Scanning) ---
+  // --- Ultra-Compact Custom SDP Formatter (30-60 chars for huge QR dots) ---
   compressSdp(sdpInit) {
     if (!sdpInit || !sdpInit.sdp) return '';
     const lines = sdpInit.sdp.split('\r\n');
     let ufrag = '', pwd = '', fp = '';
-    const candidates = [];
+    const candList = [];
 
     for (const line of lines) {
       if (line.startsWith('a=ice-ufrag:')) ufrag = line.split(':')[1];
       else if (line.startsWith('a=ice-pwd:')) pwd = line.split(':')[1];
-      else if (line.startsWith('a=fingerprint:sha-256 ')) fp = line.split(' ')[1];
-      else if (line.startsWith('a=candidate:')) {
+      else if (line.startsWith('a=fingerprint:sha-256 ')) {
+        fp = line.split(' ')[1].replace(/:/g, ''); // Remove colons
+      } else if (line.startsWith('a=candidate:')) {
         const parts = line.substring(12).split(' ');
         if (parts.length >= 8) {
-          candidates.push([parts[0], parts[2], parts[3], parts[4], parts[5], parts[7]]);
+          // IP, Port, Type
+          candList.push(`${parts[4]}:${parts[5]}:${parts[7]}`);
         }
       }
     }
 
-    const miniObj = {
-      t: sdpInit.type,
-      u: ufrag,
-      p: pwd,
-      f: fp,
-      c: candidates
-    };
-
-    return btoa(JSON.stringify(miniObj));
+    const typeFlag = sdpInit.type === 'offer' ? 'O' : 'A';
+    // Format: O,ufrag,pwd,fp,ip1:port1:typ1|ip2:port2:typ2
+    return `${typeFlag},${ufrag},${pwd},${fp},${candList.join('|')}`;
   }
 
   decompressSdp(compressedStr) {
     try {
-      const rawJson = atob(compressedStr.trim());
-      const miniObj = JSON.parse(rawJson);
+      const str = (compressedStr || '').trim();
+      
+      // Fallback for Base64 or JSON
+      if (str.startsWith('{') || str.startsWith('eyJ')) {
+        const rawJson = atob ? atob(str) : str;
+        const obj = JSON.parse(rawJson);
+        if (obj.sdp) return obj;
+      }
 
-      // Fallback for non-compressed raw SDP JSON
-      if (miniObj.sdp && miniObj.type) return miniObj;
+      const parts = str.split(',');
+      if (parts.length < 4) throw new Error('コードフォーマットが不正です');
+
+      const typeFlag = parts[0];
+      const ufrag = parts[1];
+      const pwd = parts[2];
+      const rawFp = parts[3];
+      const candStr = parts[4] || '';
+
+      // Reformat Fingerprint (add colons back)
+      const fpFormatted = rawFp.match(/.{1,2}/g)?.join(':') || rawFp;
+
+      const type = typeFlag === 'O' ? 'offer' : 'answer';
 
       let sdp = 'v=0\r\n' +
         'o=- 1234567890 2 IN IP4 127.0.0.1\r\n' +
@@ -131,26 +144,27 @@ class WebRTCP2PChat {
         'a=msid-semantic: WMS\r\n' +
         'm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\n' +
         'c=IN IP4 0.0.0.0\r\n' +
-        'a=ice-ufrag:' + miniObj.u + '\r\n' +
-        'a=ice-pwd:' + miniObj.p + '\r\n' +
-        'a=fingerprint:sha-256 ' + miniObj.f + '\r\n' +
-        'a=setup:' + (miniObj.t === 'offer' ? 'actpass' : 'active') + '\r\n' +
+        'a=ice-ufrag:' + ufrag + '\r\n' +
+        'a=ice-pwd:' + pwd + '\r\n' +
+        'a=fingerprint:sha-256 ' + fpFormatted + '\r\n' +
+        'a=setup:' + (type === 'offer' ? 'actpass' : 'active') + '\r\n' +
         'a=mid:0\r\n' +
         'a=sctp-port:5000\r\n';
 
-      if (miniObj.c && Array.isArray(miniObj.c)) {
-        for (const cand of miniObj.c) {
-          sdp += `a=candidate:${cand[0]} 1 ${cand[1]} ${cand[2]} ${cand[3]} ${cand[4]} typ ${cand[5]}\r\n`;
-        }
+      if (candStr) {
+        const cands = candStr.split('|');
+        cands.forEach((c, idx) => {
+          const [ip, port, ctype] = c.split(':');
+          if (ip && port) {
+            sdp += `a=candidate:${idx + 1} 1 UDP ${2122260223 - idx} ${ip} ${port} typ ${ctype || 'host'}\r\n`;
+          }
+        });
       }
 
-      return {
-        type: miniObj.t,
-        sdp: sdp
-      };
+      return { type, sdp };
     } catch (e) {
       console.error('Decompress Error:', e);
-      throw new Error('コードの解読に失敗しました');
+      throw new Error('コードの解読に失敗しました: ' + e.message);
     }
   }
 
@@ -161,7 +175,7 @@ class WebRTCP2PChat {
     document.getElementById('hostPanel').style.display = 'block';
     document.getElementById('guestPanel').style.display = 'none';
 
-    this.addSystemLog('【親機】超軽量招待コード＆QRコードを生成中...');
+    this.addSystemLog('【親機】超極小招待コード（約40文字）＆特大ドットQRコードを生成中...');
 
     const pc = this.createPeerConnection();
 
@@ -173,7 +187,7 @@ class WebRTCP2PChat {
 
     await this.waitForIceGathering(pc);
 
-    // Compress SDP for ultra-light QR (150 chars)
+    // Ultra-compact SDP Compression (approx. 40-50 chars)
     const offerCode = this.compressSdp(pc.localDescription);
     document.getElementById('hostOfferCode').value = offerCode;
 
@@ -187,7 +201,7 @@ class WebRTCP2PChat {
       if (typeof QRCode !== 'undefined' && QRCode.renderQRCode) {
         QRCode.renderQRCode(canvasId, textCode, 180);
         console.log(`[QR Debug] ${label} 描画成功! (文字数: ${textCode.length})`);
-        this.addSystemLog(`${label} クッキリ見やすいQRコードの描画に成功しました (文字数: ${textCode.length})`);
+        this.addSystemLog(`${label} 特大ドットQRコードの描画に成功しました (文字数: わずか ${textCode.length} 文字!)`);
       } else {
         throw new Error('QRCode ライブラリが初期化されていません');
       }
@@ -246,7 +260,7 @@ class WebRTCP2PChat {
 
       await this.waitForIceGathering(pc);
 
-      // Compress SDP for ultra-light Answer QR
+      // Ultra-compact Answer SDP
       const answerCode = this.compressSdp(pc.localDescription);
       document.getElementById('guestAnswerCode').value = answerCode;
       document.getElementById('guestAnswerSection').style.display = 'block';
