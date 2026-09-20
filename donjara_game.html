@@ -825,7 +825,7 @@
     <div class="gameover-card">
       <h2>🏁 対局終了</h2>
       <div class="final-result" id="finalResult"></div>
-      <button class="btn-primary" style="width: 100%;" onclick="app.resetAll()">もう一度 / メニューへ</button>
+      <button class="btn-primary" style="width: 100%;" onclick="app.playAgain()">もう一度 / メニューへ</button>
     </div>
   </div>
 
@@ -923,13 +923,21 @@
           },
           onMessage: (packet) => {
             if (!this.game || !packet) return;
-            if (this.state.p2pRole === 'host') this.game.handleHostMessage(packet);
-            else this.game.handleGuestMessage(packet);
+            if (this.state.p2pRole === 'host' && packet.t === 'replay') {
+              this.pvpGuestReplayReady = true;
+              if (this.pvpReplayReady) this.startPvpRematch();
+            } else if (this.state.p2pRole === 'host') {
+              this.game.handleHostMessage(packet);
+            } else {
+              this.game.handleGuestMessage(packet);
+            }
           }
         });
       }
 
       startPvpGame() {
+        this.pvpReplayReady = false;
+        this.pvpGuestReplayReady = false;
         this.showGameBoard();
         document.getElementById('hostPanel').style.display = 'none';
         document.getElementById('guestPanel').style.display = 'none';
@@ -975,6 +983,29 @@
           console.error('Create Answer Error:', err);
           alert('招待コードの読み取り/解析に失敗しました。');
         }
+      }
+
+      playAgain() {
+        if (this.state.p2pRole === 'host' || this.state.p2pRole === 'guest') {
+          if (this.state.p2pRole === 'host') {
+            this.pvpReplayReady = true;
+            if (this.pvpGuestReplayReady) this.startPvpRematch();
+          } else {
+            this.pvpReplayReady = true;
+            if (this.conn) this.conn.sendJSON({ t: 'replay' });
+            document.getElementById('finalResult').innerText = '相手の再戦準備を待っています…';
+          }
+          return;
+        }
+        this.startVsComputer();
+      }
+
+      startPvpRematch() {
+        this.pvpReplayReady = false;
+        this.pvpGuestReplayReady = false;
+        this.game = new DonjaraGame('pvpHost', { conn: this.conn });
+        this.showGameBoard();
+        this.game.startGame();
       }
 
       // ---------- カメラQR ----------

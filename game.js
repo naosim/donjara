@@ -249,6 +249,10 @@ class DonjaraGame {
     return cards.map((c) => (c.wild ? '⭐ジョーカー' : `${c.emoji}${c.label}`)).join(' ');
   }
 
+  riverLabel(cards) {
+    return cards.map((c) => `${c.id}:${c.wild ? '⭐ジョーカー' : `${c.emoji}${c.label}`}${c.riichi ? '[リーチ]' : ''}`).join(' ');
+  }
+
   /** 両プレイヤーの持ち札・ツモをコンソールへ出力（デバッグ用） */
   logState(tag) {
     if (typeof console === 'undefined') return;
@@ -258,7 +262,9 @@ class DonjaraGame {
     console.log(`[ドンジャラ] ${tag} 第${s.round}局 ${p0}: ${this.handLabel(s.hands[0])}` +
       (s.draw[0] ? ` | ツモ:${this.handLabel([s.draw[0]])}` : '') +
       ` ／ ${p1}: ${this.handLabel(s.hands[1])}` +
-      (s.draw[1] ? ` | ツモ:${this.handLabel([s.draw[1]])}` : ''));
+      (s.draw[1] ? ` | ツモ:${this.handLabel([s.draw[1]])}` : '') +
+      ` | 河${p0}:${this.riverLabel(s.rivers[0])}` +
+      ` ／ 河${p1}:${this.riverLabel(s.rivers[1])}`);
   }
 
   cardInList(cardId, list) {
@@ -269,6 +275,10 @@ class DonjaraGame {
   playerName(i) {
     if (this.mode === 'ai') return this.players[i].name;
     return i === 0 ? '親機' : '子機';
+  }
+
+  turnLabel(i) {
+    return i === this.selfIndex ? 'あなたのターン' : '相手のターン';
   }
 
   /** あがり判定・テンパイ判定に使う「手札+ポンで成立した3枚組（メルド）」の全牌 */
@@ -435,7 +445,7 @@ class DonjaraGame {
     // ツモあがり可能か
     const winInfo = this.canWinByDraw(i);
     // bug010: ツモ牌は自分の selfDraw にのみ表示し、メッセージには載せない（PvPで相手に漏れないように）
-    this.state.msg = `${this.playerName(i)} のターン`;
+    this.state.msg = this.turnLabel(i);
     this.logState('ツモ');
     this.render();
 
@@ -485,9 +495,18 @@ class DonjaraGame {
       if (want) {
         // ポン: 捨て牌と同柄2枚を3枚組（メルド）として確定。メルドからは捨てられない
         const got = this.state.lastDiscard.card;
+        const discardedPlayer = this.state.lastDiscard.player;
         const two = this.state.hands[opp].filter((c) => !c.wild && c.motif === got.motif).slice(0, 2);
         this.state.hands[opp] = this.state.hands[opp].filter((c) => !two.includes(c));
         this.state.melds[opp].push({ motif: got.motif, cards: [two[0], two[1], got] });
+        const discardedRiver = this.state.rivers[discardedPlayer];
+        const discardedIndex = discardedRiver.findIndex((c) => c.id === got.id);
+        if (discardedIndex >= 0) {
+          this.state.rivers[discardedPlayer] = discardedRiver.filter((c) => c.id !== got.id);
+          if (got.riichi && discardedIndex > 0) {
+            this.state.rivers[discardedPlayer][discardedIndex - 1].riichi = true;
+          }
+        }
         this.state.lastDiscard = null;
         this.state.msg = `✋ ${this.playerName(opp)} がポン！(${cardLabel(got)})`;
         this.logState('ポン');
@@ -686,6 +705,7 @@ class DonjaraGame {
       riichi: s.riichi.slice(),
       guestHand,
       guestDraw: s.draw[1],
+      hostHand: s.hands[0],
       hostHandCount: s.hands[0].length,
       guestMelds: s.melds[1],
       hostMelds: s.melds[0],
@@ -767,14 +787,18 @@ class DonjaraGame {
     document.getElementById('msg').innerText = s.msg;
     document.getElementById('oppInfo').innerText = this.players[1].name + (s.riichi[1] ? '（🔔リーチ中）' : '');
 
-    // 相手（index1）: 手札裏・メルド・捨て牌
+    // 相手（index1）: 手札・メルド・捨て牌
     this.renderRiver('oppRiver', s.rivers[1]);
     document.getElementById('oppHandBack').innerHTML = '';
-    for (let i = 0; i < s.hands[1].length; i++) {
-      const el = document.createElement('div');
-      el.className = 'd-card d-card-back';
-      el.innerText = '🂠';
-      document.getElementById('oppHandBack').appendChild(el);
+    if (s.phase === 'roundEnd' || s.phase === 'gameOver') {
+      s.hands[1].forEach((c) => document.getElementById('oppHandBack').appendChild(this.cardEl(c, false)));
+    } else {
+      for (let i = 0; i < s.hands[1].length; i++) {
+        const el = document.createElement('div');
+        el.className = 'd-card d-card-back';
+        el.innerText = '🂠';
+        document.getElementById('oppHandBack').appendChild(el);
+      }
     }
     this.renderMelds('oppMeld', s.melds[1]);
 
@@ -896,11 +920,15 @@ class DonjaraGame {
     // 相手（親機）: index0
     this.renderRiver('oppRiver', v.hostRiver);
     document.getElementById('oppHandBack').innerHTML = '';
-    for (let i = 0; i < (v.hostHandCount || 0); i++) {
-      const el = document.createElement('div');
-      el.className = 'd-card d-card-back';
-      el.innerText = '🂠';
-      document.getElementById('oppHandBack').appendChild(el);
+    if (v.phase === 'roundEnd' || v.phase === 'gameOver') {
+      (v.hostHand || []).forEach((c) => document.getElementById('oppHandBack').appendChild(this.cardEl(c, false)));
+    } else {
+      for (let i = 0; i < (v.hostHandCount || 0); i++) {
+        const el = document.createElement('div');
+        el.className = 'd-card d-card-back';
+        el.innerText = '🂠';
+        document.getElementById('oppHandBack').appendChild(el);
+      }
     }
     this.renderMelds('oppMeld', v.hostMelds);
 
