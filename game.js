@@ -312,12 +312,17 @@ class DonjaraGame {
 
   // ---------- 手札の表示順（並び替え） ----------
   motifOrder(c) {
-    if (c.wild) return 99;
+    if (c.wild) return 0;
     const idx = DONJARA_MOTIFS.findIndex((m) => m.id === c.motif);
-    return idx < 0 ? 98 : idx;
+    return idx < 0 ? 99 : idx + 1;
   }
 
-  /** 表示する手札を毎回柄順（ジョーカー最後）に並べ替えて返す（bug007: 常に自動ソート） */
+  /** 保持している手札配列を柄順（オールマイティ先頭）に並べ替える */
+  sortHand(cards) {
+    return cards.sort((a, b) => this.motifOrder(a) - this.motifOrder(b));
+  }
+
+  /** 表示用の手札も同じ順序で返す */
   applyDisplayOrder(cards) {
     return cards.slice().sort((a, b) => this.motifOrder(a) - this.motifOrder(b));
   }
@@ -418,7 +423,8 @@ class DonjaraGame {
       this.state.hands[0].push(deck[i]);
       this.state.hands[1].push(deck[8 + i]);
     }
-    // 配牌直後に自分の手札を柄順へ（毎回の表示も applyDisplayOrder で自動ソート）
+    this.sortHand(this.state.hands[0]);
+    this.sortHand(this.state.hands[1]);
     this.state.msg = `🔔 第${this.state.round}局 開始（先手: ${this.playerName(this.state.first)}）`;
     this.logState('配牌');
     this.render();
@@ -498,6 +504,7 @@ class DonjaraGame {
         const discardedPlayer = this.state.lastDiscard.player;
         const two = this.state.hands[opp].filter((c) => !c.wild && c.motif === got.motif).slice(0, 2);
         this.state.hands[opp] = this.state.hands[opp].filter((c) => !two.includes(c));
+        this.sortHand(this.state.hands[opp]);
         this.state.melds[opp].push({ motif: got.motif, cards: [two[0], two[1], got] });
         const discardedRiver = this.state.rivers[discardedPlayer];
         const discardedIndex = discardedRiver.findIndex((c) => c.id === got.id);
@@ -587,6 +594,7 @@ class DonjaraGame {
       if (this.state.draw[i]) {
         this.state.hands[i].push(this.state.draw[i]);
         this.state.draw[i] = null;
+        this.sortHand(this.state.hands[i]);
       }
     }
     if (!card) return;
