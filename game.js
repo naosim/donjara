@@ -8,28 +8,28 @@
 // ---------------------------------------------------------------
 // 定数・カード定義
 // ---------------------------------------------------------------
-const DONJARA_MOTIFS = [
-  { id: 'inu',   emoji: '🐶', label: '犬' },
-  { id: 'neko',  emoji: '🐱', label: '猫' },
-  { id: 'kitsune', emoji: '🦊', label: '狐' },
-  { id: 'panda', emoji: '🐼', label: 'パンダ' },
-  { id: 'buta',  emoji: '🐷', label: '豚' },
-  { id: 'usagi', emoji: '🐰', label: '兎' },
-  { id: 'kaeru', emoji: '🐸', label: '蛙' },
-  { id: 'tori',  emoji: '🐔', label: '鳥' },
-  { id: 'sakana', emoji: '🐟', label: '魚' }
-];
+const DONJARA_MOTIFS = window.DONJARA_MOTIFS;
 
 const WILD = { id: 'wild', emoji: '⭐', label: 'ジョーカー' };
 
 let CARD_SEQ = 0;
 
-/** 83枚デッキ生成: 9柄×9枚 + ジョーカー2枚 */
+/** デッキ生成: 柄ごとのバリエーション枚数 + ジョーカー2枚 */
 function buildDeck() {
   const deck = [];
   for (const m of DONJARA_MOTIFS) {
-    for (let i = 0; i < 9; i++) {
-      deck.push({ id: ++CARD_SEQ, motif: m.id, emoji: m.emoji, label: m.label, wild: false });
+    for (const variant of m.variants) {
+      for (let i = 0; i < variant.count; i++) {
+        deck.push({
+          id: ++CARD_SEQ,
+          motif: m.id,
+          variant: variant.number,
+          variantLabel: variant.label || '',
+          emoji: m.emoji,
+          label: variant.label || '',
+          wild: false
+        });
+      }
     }
   }
   for (let i = 0; i < 2; i++) {
