@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>役判定テスト</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .card-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 15px 0;
+      padding: 15px;
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+    .card-btn {
+      width: 60px;
+      height: 80px;
+      border: 2px solid #333;
+      border-radius: 8px;
+      background: white;
+      font-size: 24px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .card-btn:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    .card-btn.selected {
+      background: #e8f5e9;
+      border-color: #4caf50;
+      box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.3);
+    }
+    .card-btn.wild {
+      border-color: #ff9800;
+      background: #fff3e0;
+    }
+    .result-box {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      margin-top: 20px;
+    }
+    .yaku-item {
+      padding: 10px;
+      margin: 5px 0;
+      background: #f9f9f9;
+      border-radius: 4px;
+      border-left: 4px solid #2196f3;
+    }
+    .yaku-name {
+      font-weight: bold;
+      font-size: 1.1em;
+    }
+    .yaku-points {
+      color: #2196f3;
+      font-weight: bold;
+      float: right;
+    }
+    .yaku-desc {
+      font-size: 0.9em;
+      color: #666;
+      margin-top: 5px;
+    }
+    .total-points {
+      font-size: 1.5em;
+      font-weight: bold;
+      color: #4caf50;
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 2px solid #ddd;
+    }
+    .selected-cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 15px 0;
+      padding: 15px;
+      background: #e3f2fd;
+      border-radius: 8px;
+      min-height: 80px;
+    }
+    .selected-card {
+      width: 60px;
+      height: 80px;
+      border: 2px solid #2196f3;
+      border-radius: 8px;
+      background: white;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .remove-btn {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      width: 24px;
+      height: 24px;
+      background: #f44336;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .motif-section {
+      margin: 20px 0;
+      padding: 15px;
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+    .motif-title {
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #333;
+    }
+    .actions {
+      margin: 20px 0;
+      display: flex;
+      gap: 10px;
+    }
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .btn-primary {
+      background: #2196f3;
+      color: white;
+    }
+    .btn-secondary {
+      background: #757575;
+      color: white;
+    }
+    .btn:hover {
+      opacity: 0.9;
+    }
+    .count-display {
+      font-size: 0.9em;
+      color: #666;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎴 役判定テスト</h1>
+  <p>牌をクリックして選択（9枚選択して「判定」ボタンを押してください）</p>
+
+  <div class="selected-cards" id="selectedCards">
+    <span style="color: #999; font-size: 0.9em;">選択された牌（0/9）</span>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" onclick="testYaku()">🎯 判定</button>
+    <button class="btn btn-secondary" onclick="clearSelection()">🗑️ クリア</button>
+  </div>
+
+  <div id="motifSelection"></div>
+
+  <div class="result-box" id="resultBox" style="display: none;">
+    <h2>判定結果</h2>
+    <div id="yakuList"></div>
+    <div class="total-points" id="totalPoints"></div>
+  </div>
+
+  <script src="donjara_config.js"></script>
+  <script src="game.js"></script>
+  <script>
+    let selectedCards = [];
+    const MAX_CARDS = 9;
+
+    // 柄ごとの牌を生成
+    function createMotifCards(motif) {
+      const cards = [];
+      for (const variant of motif.variants) {
+        for (let i = 0; i < variant.count; i++) {
+          cards.push({
+            id: `${motif.id}-${variant.number}-${i}`,
+            motif: motif.id,
+            variant: variant.number,
+            emoji: motif.emoji,
+            label: variant.label || '',
+            wild: false
+          });
+        }
+      }
+      return cards;
+    }
+
+    // ジョーカーを生成
+    function createJokers() {
+      return [
+        { id: 'wild-1', motif: 'wild', emoji: '⭐', label: 'ジョーカー', wild: true },
+        { id: 'wild-2', motif: 'wild', emoji: '⭐', label: 'ジョーカー', wild: true }
+      ];
+    }
+
+    // 牌選択UIを生成
+    function renderMotifSelection() {
+      const container = document.getElementById('motifSelection');
+      container.innerHTML = '';
+
+      // ジョーカー
+      const jokerSection = document.createElement('div');
+      jokerSection.className = 'motif-section';
+      jokerSection.innerHTML = '<div class="motif-title">⭐ ジョーカー</div>';
+      const jokerContainer = document.createElement('div');
+      jokerContainer.className = 'card-container';
+      
+      createJokers().forEach(card => {
+        const btn = document.createElement('button');
+        btn.className = 'card-btn wild';
+        btn.innerHTML = card.emoji;
+        btn.onclick = () => toggleCard(card, btn);
+        jokerContainer.appendChild(btn);
+      });
+      
+      jokerSection.appendChild(jokerContainer);
+      container.appendChild(jokerSection);
+
+      // 各柄
+      DONJARA_MOTIFS.forEach(motif => {
+        const section = document.createElement('div');
+        section.className = 'motif-section';
+        section.innerHTML = `<div class="motif-title">${motif.emoji} ${motif.label}</div>`;
+        
+        const cardContainer = document.createElement('div');
+        cardContainer.className = 'card-container';
+        
+        createMotifCards(motif).forEach(card => {
+          const btn = document.createElement('button');
+          btn.className = 'card-btn';
+          btn.innerHTML = card.emoji + (card.label ? `<span style="font-size:12px">${card.label}</span>` : '');
+          btn.onclick = () => toggleCard(card, btn);
+          cardContainer.appendChild(btn);
+        });
+        
+        section.appendChild(cardContainer);
+        container.appendChild(section);
+      });
+    }
+
+    // 牌の選択/解除
+    function toggleCard(card, btn) {
+      const index = selectedCards.findIndex(c => c.id === card.id);
+      
+      if (index >= 0) {
+        // 解除
+        selectedCards.splice(index, 1);
+        btn.classList.remove('selected');
+      } else {
+        // 選択
+        if (selectedCards.length >= MAX_CARDS) {
+          alert(`最大${MAX_CARDS}枚まで選択できます`);
+          return;
+        }
+        selectedCards.push(card);
+        btn.classList.add('selected');
+      }
+      
+      renderSelectedCards();
+    }
+
+    // 選択された牌を表示
+    function renderSelectedCards() {
+      const container = document.getElementById('selectedCards');
+      
+      if (selectedCards.length === 0) {
+        container.innerHTML = '<span style="color: #999; font-size: 0.9em;">選択された牌（0/9）</span>';
+        return;
+      }
+      
+      container.innerHTML = `<span style="color: #666; font-size: 0.9em; margin-right: 10px;">選択された牌（${selectedCards.length}/9）</span>`;
+      
+      selectedCards.forEach((card, index) => {
+        const cardDiv = document.createElement('div');
+        cardDiv.className = 'selected-card';
+        if (card.wild) {
+          cardDiv.style.borderColor = '#ff9800';
+          cardDiv.style.background = '#fff3e0';
+        }
+        cardDiv.innerHTML = card.emoji + (card.label ? `<span style="font-size:12px">${card.label}</span>` : '');
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-btn';
+        removeBtn.innerHTML = '×';
+        removeBtn.onclick = () => removeCard(index);
+        
+        cardDiv.appendChild(removeBtn);
+        container.appendChild(cardDiv);
+      });
+    }
+
+    // 牌を削除
+    function removeCard(index) {
+      const card = selectedCards[index];
+      selectedCards.splice(index, 1);
+      
+      // ボタンの選択状態を解除
+      const buttons = document.querySelectorAll('.card-btn');
+      buttons.forEach(btn => {
+        if (btn.innerHTML.includes(card.emoji) && btn.classList.contains('selected')) {
+          btn.classList.remove('selected');
+        }
+      });
+      
+      renderSelectedCards();
+    }
+
+    // クリア
+    function clearSelection() {
+      selectedCards = [];
+      document.querySelectorAll('.card-btn').forEach(btn => btn.classList.remove('selected'));
+      renderSelectedCards();
+      document.getElementById('resultBox').style.display = 'none';
+    }
+
+    // 役判定
+    function testYaku() {
+      if (selectedCards.length !== 9) {
+        alert(`正確に9枚選択してください（現在: ${selectedCards.length}枚）`);
+        return;
+      }
+
+      const resultBox = document.getElementById('resultBox');
+      const yakuList = document.getElementById('yakuList');
+      const totalPoints = document.getElementById('totalPoints');
+
+      // あがり形を分析
+      const winInfo = analyzeWin9(selectedCards);
+      
+      if (!winInfo) {
+        yakuList.innerHTML = '<div style="color: #f44336; padding: 15px;">あがり形ではありません（3枚組×3組に分解できません）</div>';
+        totalPoints.innerHTML = '';
+        resultBox.style.display = 'block';
+        return;
+      }
+
+      // 役を評価
+      const scoreResult = scoreYaku(winInfo.groups, winInfo.jokersUsed);
+      
+      if (scoreResult.yaku.length === 0) {
+        yakuList.innerHTML = '<div style="color: #f44336; padding: 15px;">成立する役がありません</div>';
+        totalPoints.innerHTML = '合計: 0点';
+        resultBox.style.display = 'block';
+        return;
+      }
+
+      // 結果を表示
+      yakuList.innerHTML = scoreResult.yaku.map(yaku => `
+        <div class="yaku-item">
+          <div class="yaku-name">${yaku.name} <span class="yaku-points">${yaku.pts}点</span></div>
+          <div class="yaku-desc">${yaku.description}</div>
+        </div>
+      `).join('');
+
+      totalPoints.innerHTML = `合計: ${scoreResult.total}点`;
+      resultBox.style.display = 'block';
+
+      // デバッグ情報
+      console.log('選択された牌:', selectedCards);
+      console.log('分解結果:', winInfo);
+      console.log('役評価:', scoreResult);
+    }
+
+    // 初期化
+    renderMotifSelection();
+  </script>
+</body>
+</html>

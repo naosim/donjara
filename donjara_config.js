@@ -78,7 +78,8 @@ class Yaku {
    * @returns {boolean} 役が成立していればtrue。
    */
   isSatisfied(cards, context = {}) {
-    return false;
+    return Array.isArray(cards) && cards.length === 9 &&
+      Array.isArray(context.groups) && context.groups.length === 3;
   }
 
   /**
@@ -130,6 +131,9 @@ class SixYaku extends Yaku {
    * @returns {boolean} 3組の柄がすべて異なればtrue。
    */
   isSatisfied(cards, context = {}) {
+    if (super.isSatisfied(cards, context) == false) {
+      return false;
+    }
     return new Set((context.groups || []).map((group) => group.motif)).size === 2;
   }
 }
@@ -150,6 +154,54 @@ class IppatsuYaku extends Yaku {
   }
 }
 
+class PuukkuriYaku extends Yaku {
+  constructor() {
+    super('pukkuri', 'ぷっくり', 12, 'agari', '🐼・🐷を含み3組をそろえる');
+  }
+
+  /**
+   * @param {Array<object>} cards ソート済みの判定対象牌一覧。
+   * @param {YakuSatisfiedContext} context あがり形の判定結果。groupsに各組の柄を含む。
+   * @returns {boolean} descriptionに書かれた条件を満たせばtrue。
+   */
+  isSatisfied(cards, context = {}) {
+    if (super.isSatisfied(cards, context) == false) {
+      return false;
+    }
+    var groups = new Set();
+    (context.groups || []).forEach(group => groups.add(group.motif));
+    return groups.has("panda") && groups.has("buta");
+  }
+}
+
+class AllKaeruYaku extends Yaku {
+  constructor() {
+    super('allKaeru', 'かえる全種', 18, 'agari', '🐷・🐸(全種類)を含み3組をそろえる');
+  }
+
+  /**
+   * @param {Array<object>} cards ソート済みの判定対象牌一覧。
+   * @param {YakuSatisfiedContext} context あがり形の判定結果。groupsに各組の柄を含む。
+   * @returns {boolean} descriptionに書かれた条件を満たせばtrue。
+   */
+  isSatisfied(cards, context = {}) {
+    if (super.isSatisfied(cards, context) == false) {
+      return false;
+    }
+    var kaeruVari = [false, false, false];
+    var groups = new Set();
+    (context.groups || []).forEach(group => {
+      groups.add(group.motif);
+
+      if (group.motif == 'kaeru') {
+        group.cards.forEach(card => kaeruVari[card.variant - 1] = true)
+      }
+    });
+
+    return groups.has("buta") && (kaeruVari[0] && kaeruVari[1] && kaeruVari[2]);
+  }
+}
+
 class HaYaku extends Yaku {
   constructor() {
     super('ha', 'はー', 36, 'agari', '🐼・🐱・🐶の3組をそろえる');
@@ -161,6 +213,9 @@ class HaYaku extends Yaku {
    * @returns {boolean} descriptionに書かれた条件を満たせばtrue。
    */
   isSatisfied(cards, context = {}) {
+    if (super.isSatisfied(cards, context) == false) {
+      return false;
+    }
     var groups = new Set();
     (context.groups || []).forEach(group => groups.add(group.motif));
     return groups.has("panda") && groups.has("neko") && groups.has("inu");
@@ -179,6 +234,9 @@ class NantokaYaku extends Yaku {
    * @returns {boolean} descriptionに書かれた条件を満たせばtrue。
    */
   isSatisfied(cards, context = {}) {
+    if (super.isSatisfied(cards, context) == false) {
+      return false;
+    }
     var groups = new Set();
     (context.groups || []).forEach(group => groups.add(group.motif));
     return groups.has("inu") && groups.has("sakana") && (groups.has("neko") || groups.has("usagi"));
@@ -196,6 +254,9 @@ class FightingYaku extends Yaku {
    * @returns {boolean} descriptionに書かれた条件を満たせばtrue。
    */
   isSatisfied(cards, context = {}) {
+    if (super.isSatisfied(cards, context) == false) {
+      return false;
+    }
     var groups = new Set();
     (context.groups || []).forEach(group => groups.add(group.motif));
     return groups.has("kitsune") && groups.has("buta") && groups.has("kaeru")
@@ -213,6 +274,9 @@ class StudyingYaku extends Yaku {
    * @returns {boolean} リーチ一発の条件を満たしていればtrue。
    */
   isSatisfied(cards, context = {}) {
+    if (super.isSatisfied(cards, context) == false) {
+      return false;
+    }
     var groups = new Set();
     (context.groups || []).forEach(group => groups.add(group.motif));
     return groups.has("neko") && groups.has("usagi") && groups.has("kitsune")
@@ -230,6 +294,9 @@ class AllStarsYaku extends Yaku {
    * @returns {boolean} リーチ一発の条件を満たしていればtrue。
    */
   isSatisfied(cards, context = {}) {
+    if (super.isSatisfied(cards, context) == false) {
+      return false;
+    }
     var groups = new Set();
     (context.groups || []).forEach(group => groups.add(group.motif));
     return groups.has("neko") && groups.has("usagi") && groups.has("inu")
@@ -289,6 +356,8 @@ class YakuManager {
 
 window.DONJARA_YAKU_CLASSES = {
   BasicYaku,
+  PuukkuriYaku,
+  AllKaeruYaku,
   SixYaku,
   HaYaku,
   NantokaYaku,
