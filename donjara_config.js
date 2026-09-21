@@ -19,6 +19,7 @@ window.DONJARA_MOTIFS = [
  * @typedef {object} YakuSatisfiedContext
  * @property {Array<YakuGroup>} groups ソート済みの3枚組一覧。通常は3要素で、各要素のcardsも牌ソート順に並ぶ。
  * @property {number} jokersUsed あがり形で使用したジョーカーの枚数。
+ * @property {boolean} [ippatsu] リーチ一発の場合はtrue（リーチ一発役用）。
  */
 
 /**
@@ -27,6 +28,7 @@ window.DONJARA_MOTIFS = [
  * @typedef {object} YakuGroup
  * @property {string} motif 3枚組として扱う柄ID。ジョーカーを含む場合も、割り当てられた柄IDを持つ。
  * @property {Array<YakuCard>} cards 3枚組を構成する牌。牌ソート順に並んだ3枚の一覧。
+ * ジョーカーが含まれる場合、そのmotifプロパティは'wild'のままですが、グループのmotifプロパティは割り当てられた柄IDになります。
  */
 
 /**
@@ -78,6 +80,8 @@ class Yaku {
    * @returns {boolean} 役が成立していればtrue。
    */
   isSatisfied(cards, context = {}) {
+    // 注意: cardsパラメータはanalyzeWin9からの出力で、すでに3枚組×3組に分解されています。
+    // このメソッドは主にcontext.groupsをチェックして役固有の条件を判定します。
     return Array.isArray(cards) && cards.length === 9 &&
       Array.isArray(context.groups) && context.groups.length === 3;
   }
@@ -115,6 +119,8 @@ class BasicYaku extends Yaku {
    * @returns {boolean} 3組のあがり形が成立していればtrue。
    */
   isSatisfied(cards, context = {}) {
+    // 注意: cardsパラメータはanalyzeWin9からの出力で、すでに3枚組×3組に分解されています。
+    // このメソッドは主にcontext.groupsをチェックして役固有の条件を判定します。
     return Array.isArray(cards) && cards.length === 9 &&
       Array.isArray(context.groups) && context.groups.length === 3;
   }

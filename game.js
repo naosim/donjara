@@ -119,25 +119,32 @@ function analyzeWin9(cards) {
     // 組を構成
     const groups = [];
     const pool = cards.slice();
+    const wildPool = pool.filter(c => c.wild);
+    const nonWildPool = pool.filter(c => !c.wild);
+    
     for (const mid of motifIds) {
       const cnt = counts[mid] || 0;
       for (let g = 0; g < cnt / 3; g++) {
         const groupCards = [];
         let need = 3;
-        for (const c of pool) {
+        
+        // まず該当柄の通常牌を追加
+        for (let i = nonWildPool.length - 1; i >= 0; i--) {
           if (need === 0) break;
-          if (c.wild) {
+          const c = nonWildPool[i];
+          if (c.motif === mid) {
             groupCards.push(c);
-            need--;
-          } else if (c.motif === mid && need > 0) {
-            groupCards.push(c);
+            nonWildPool.splice(i, 1);
             need--;
           }
         }
-        groupCards.forEach((c) => {
-          const idx = pool.indexOf(c);
-          if (idx >= 0) pool.splice(idx, 1);
-        });
+        
+        // 足りない分をジョーカーで補う
+        while (need > 0 && wildPool.length > 0) {
+          groupCards.push(wildPool.pop());
+          need--;
+        }
+        
         groups.push({ motif: mid, cards: groupCards });
       }
     }
