@@ -199,7 +199,13 @@ class DonjaraAI {
     this.rand = rand || Math.random;
   }
 
-  thinkDiscard(cards) {
+  /**
+   * 捨て牌を決定する
+   * @param {Array} cards - 自分の手札+ツモ牌
+   * @param {Object} gameState - ゲーム状態 { myHand, myRiver, myMelds, oppRiver, oppMelds, wallCount, etc }
+   * @returns {number} 捨てる牌のID
+   */
+  thinkDiscard(cards, gameState = {}) {
     const nonWild = cards.filter((c) => !c.wild);
     if (nonWild.length === 0) {
       return cards[Math.floor(this.rand() * cards.length)].id;
@@ -213,11 +219,22 @@ class DonjaraAI {
     return pick.id;
   }
 
-  decideWin(winInfo) {
+  /**
+   * あがるかどうかを決定する
+   * @param {Object} winInfo - あがり情報 { groups, jokersUsed }
+   * @param {Object} gameState - ゲーム状態 { myHand, myRiver, myMelds, oppRiver, oppMelds, wallCount, etc }
+   * @returns {boolean} あがるならtrue
+   */
+  decideWin(winInfo, gameState = {}) {
     return !!winInfo;
   }
 
-  decidePon() {
+  /**
+   * ポンするかどうかを決定する
+   * @param {Object} gameState - ゲーム状態 { myHand, myRiver, myMelds, oppRiver, oppMelds, lastDiscard, etc }
+   * @returns {boolean} ポンするならtrue
+   */
+  decidePon(gameState = {}) {
     return true;
   }
 }
@@ -355,6 +372,26 @@ class DonjaraGame {
     return sortCards(cards);
   }
 
+  /** AI用のゲーム状態を構築 */
+  buildGameState(playerIdx) {
+    const oppIdx = 1 - playerIdx;
+    return {
+      myHand: this.state.hands[playerIdx].slice(),
+      myDraw: this.state.draw[playerIdx],
+      myRiver: this.state.rivers[playerIdx].slice(),
+      myMelds: this.state.melds[playerIdx].slice(),
+      myRiichi: this.state.riichi[playerIdx],
+      oppRiver: this.state.rivers[oppIdx].slice(),
+      oppMelds: this.state.melds[oppIdx].slice(),
+      oppRiichi: this.state.riichi[oppIdx],
+      lastDiscard: this.state.lastDiscard,
+      wallCount: this.state.wall.length,
+      round: this.state.round,
+      turn: this.state.turn,
+      scores: this.state.scores.slice()
+    };
+  }
+
   selfHandRef() {
     if (this.mode === 'pvpGuest') {
       return ((this.remoteView && this.remoteView.guestHand) || this.state.hands[this.selfIndex]);
@@ -375,13 +412,14 @@ class DonjaraGame {
         // AI判断
         setTimeout(() => {
           let val;
+          const gameState = this.buildGameState(1);
           if (kind === 'discard') {
             const pool = this.state.hands[1].concat(this.state.draw[1] ? [this.state.draw[1]] : []);
-            val = this.ai.thinkDiscard(pool);
+            val = this.ai.thinkDiscard(pool, gameState);
           } else if (kind === 'win') {
-            val = this.ai.decideWin(this.canWinForAsk(1));
+            val = this.ai.decideWin(this.canWinForAsk(1), gameState);
           } else if (kind === 'pon') {
-            val = this.ai.decidePon();
+            val = this.ai.decidePon(gameState);
           }
           this.state.waiting = null;
           this.render();
@@ -495,7 +533,8 @@ class DonjaraGame {
         }
       }
     } else {
-      const want = this.ai.decideWin(winInfo);
+      const gameState = this.buildGameState(i);
+      const want = this.ai.decideWin(winInfo, gameState);
       if (want && winInfo) {
         await this.endRound(i, 'ツモあがり', winInfo, { ippatsu });
         return;
@@ -520,15 +559,17 @@ class DonjaraGame {
         return;
       }
     } else if (oppWin && this.players[opp].kind === 'ai') {
-      if (this.ai.decideWin(oppWin)) {
+      const gameState = this.buildGameState(opp);
+      if (this.ai.decideWin(oppWin, gameState)) {
         await this.endRound(opp, 'ロン（相手の捨て牌であがり）', oppWin, { ippatsu: oppIppatsu });
         return;
       }
     }
 
     if (this.canPon(opp) && !oppWin) {
+      const gameState = this.buildGameState(opp);
       const want = (this.players[opp].kind === 'ai')
-        ? this.ai.decidePon()
+        ? this.ai.decidePon(gameState)
         : await this.ask(opp, 'pon');
       if (want) {
         // ポン: 捨て牌と同柄2枚を3枚組（メルド）として確定。メルドからは捨てられない

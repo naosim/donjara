@@ -1197,8 +1197,11 @@
         if (!tbody) return;
         tbody.innerHTML = '';
         const yakuClasses = window.DONJARA_YAKU_CLASSES || {};
-        Object.values(yakuClasses).forEach(cls => {
-          const yaku = new cls();
+        // 得点の高い順にソート
+        const sortedYakus = Object.values(yakuClasses)
+          .map(cls => new cls())
+          .sort((a, b) => b.points - a.points);
+        sortedYakus.forEach(yaku => {
           const tr = document.createElement('tr');
           const typeLabel = yaku.type === 'agari' ? 'あがり役' : '付加役';
           const typeCls = yaku.type === 'agari' ? 'yaku-type-agari' : 'yaku-type-addition';
